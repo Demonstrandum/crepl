@@ -2,15 +2,16 @@
 
 char *trim(char *str)
 {
-	while (isspace(*str))
-        ++str;
+	char *p = strdup(str);
+	while (isspace(*p))
+        ++p;
 
-	char *end = str + strlen(str) - 1;
-    while (end > str && isspace(*end))
+	char *end = p + strlen(p) - 1;
+    while (end > p && isspace(*end))
         --end;
 
     *(end + 1) = '\0';
-    return str;
+    return p;
 }
 
 

@@ -1,18 +1,30 @@
-CC=gcc
-CFLAGS=-Wall -Wpedantic
-TARGET=crepl
-OBJS=main.o prelude.o parse.o displays.o error.o execute.o
-LINKS=-lm -lreadline
+CC := gcc
+CFLAGS := -Wall -Wpedantic
+TARGET := crepl
+OBJS := main.o prelude.o parse.o displays.o error.o execute.o
+LINKS := -lm -lreadline
 
-all: clean $(OBJS)
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
+all: clean $(TARGET)
+	@printf "\033[1mBuilt \`$(TARGET)' successfully.\033[0m\n"
+
+$(TARGET): $(OBJS)
 	$(CC) -o $(TARGET) $(LINKS) $(OBJS)
-	@printf "\n\033[1mBuilt \`$(TARGET)' successfully.\033[0m\n"
+
+install: $(TARGET)
+	@echo "Installing to $(PREFIX)/bin/$(TARGET)."
+	install -d $(PREFIX)/bin
+	install -m 755 $(TARGET) $(PREFIX)/bin
+
+main.o: prelude.o parse.o error.o
+	$(CC) -c $(CFLAGS) src/main.c
 
 prelude.o: error.o
 	$(CC) -c $(CFLAGS) src/prelude.c
 
-main.o: prelude.o parse.o error.o
-	$(CC) -c $(CFLAGS) src/main.c
 
 parse.o: error.o
 	$(CC) -c $(CFLAGS) src/parse.c
