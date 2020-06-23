@@ -1,0 +1,11 @@
+# Outfile
+crepl
+*.out
+
+# Object files
+*.o
+
+# Misc
+*.log
+desktop.ini
+.DS_Store
