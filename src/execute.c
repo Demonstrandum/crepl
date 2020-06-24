@@ -4,6 +4,21 @@
 #include "builtin.h"
 #include "displays.h"
 
+#define BINARY_OPERATION(OPERATION) do { \
+	NumberNode *l_num = type_check("+", LHS, T_NUMBER, lhs); \
+	NumberNode *r_num = type_check("+", RHS, T_NUMBER, rhs); \
+	if (l_num == NULL || r_num == NULL)    \
+		return NULL;                       \
+	data->type = T_NUMBER;                 \
+	data->value = num_ ##OPERATION (*l_num, *r_num); \
+} while (0);
+
+void free_datavalue(DataValue *data)
+{
+	free(data->value);
+	free(data);
+}
+
 /// Takes in an execution context (ctx) and a
 /// statement as produced by the parser (stmt).
 /// Returns what it evaluates to.
@@ -11,6 +26,39 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 {
 	DataValue *data = malloc(sizeof(DataValue));
 	switch (stmt->type) {
+	case IDENT_NODE: {
+		// Resolve variables by searching through local
+		// variables. If that fails, search through the
+		// superior sopes varaibles, repeat until there
+		// are no more superior scopes, if the local is
+		// found yield its corresponding value, or else
+		// throw an execution error.
+		char *ident_name = stmt->node.ident.value;
+
+		free(data);
+		data = NULL;
+
+		Context *current_ctx = ctx;
+		while (current_ctx != NULL) {
+			for (usize i = 0; i < current_ctx->locals_count; ++i) {
+				Local *local = &current_ctx->locals[i];
+				if (strcmp(local->name, ident_name) == 0) {
+					data = &local->value;
+					goto finished_search;
+				}
+			}
+			current_ctx = current_ctx->superior;
+		}
+
+finished_search:
+		if (data == NULL) {
+			ERROR_TYPE = EXECUTION_ERROR;
+			sprintf(ERROR_MSG, "Could not find variable `%s'\n"
+				"  in any local or superior scope.", ident_name);
+			return NULL;
+		}
+		break;
+	}
 	case NUMBER_NODE: {
 		data->type = T_NUMBER;
 		data->value = malloc(sizeof(NumberNode));
@@ -30,15 +78,13 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 		DataValue *rhs = execute(ctx, stmt->node.binary.right);
 
 		if (strcmp(op, "+") == 0) {
-			NumberNode *l_num = type_check("+", LHS, T_NUMBER, lhs);
-			NumberNode *r_num = type_check("+", RHS, T_NUMBER, rhs);
-			if (l_num == NULL || r_num == NULL)
-				return NULL;
-			// Finally, the addition is performed.
-			data->type = T_NUMBER;
-			data->value = num_add(*l_num, *r_num);
+			BINARY_OPERATION(add);
 		} else if (strcmp(op, "-") == 0) {
-
+			BINARY_OPERATION(sub);
+		} else if (strcmp(op, "*") == 0) {
+			BINARY_OPERATION(mul);
+		} else if (strcmp(op, "/") == 0) {
+			BINARY_OPERATION(div);
 		} else {
 			ERROR_TYPE = EXECUTION_ERROR;
 			sprintf(ERROR_MSG, "Do not know how to evaluate"
@@ -75,10 +121,13 @@ void *type_check(char *function_name, ParamPos pos,
 
 	ERROR_TYPE = TYPE_ERROR;
 	sprintf(ERROR_MSG, "Wrong type for %s of `%s' operation,\n"
-		"  needed type of `%s'.",
+		"  expected type of `%s', got type of `%s'.",
 		display_parampos(pos),
 		function_name,
-		display_datatype(type));
+		display_datatype(type),
+		value == NULL
+			? "null-pointer"
+			: display_datatype(value->type));
 	return NULL;
 }
 

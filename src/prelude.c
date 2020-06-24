@@ -1,5 +1,20 @@
 #include "prelude.h"
 
+ssize ipow(ssize base, usize exp)
+{
+    ssize result = 1;
+    do {
+        if (exp & 1)
+            result *= base;
+        exp >>= 1;
+        if (!exp)
+            break;
+        base *= base;
+    } while (true);
+
+    return result;
+}
+
 char *trim(char *str)
 {
 	char *p = strdup(str);

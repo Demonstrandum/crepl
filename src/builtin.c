@@ -75,29 +75,41 @@ NumberNode *upcast_pair(NumberNode lhs, NumberNode rhs)
 	return pair;
 }
 
-NumberNode *num_add(NumberNode lhs, NumberNode rhs)
-{
-	NumberNode *upcasted = upcast_pair(lhs, rhs);
-	if (upcasted == NULL)
-		return NULL;
-
-	NumberNode *result = upcasted + 0;
-
-	switch (result->type) {
-	case FLOAT:
-		result->value.f = upcasted[0].value.f + upcasted[1].value.f;
-		break;
-	case INT:
-		result->value.i = upcasted[0].value.i + upcasted[1].value.i;
-		break;
-	default: {
-		ERROR_TYPE = EXECUTION_ERROR;
-		strcpy(ERROR_MSG, "Unsupported number type.");
-		return NULL;
-	}
-	}
-	result = realloc(result, sizeof(NumberNode));
-	return result;
+#define BINARY_FUNCTION(NAME, OP) \
+NumberNode *num_ ## NAME (NumberNode lhs, NumberNode rhs) \
+{ \
+	NumberNode *upcasted = upcast_pair(lhs, rhs); \
+	if (upcasted == NULL) \
+		return NULL; \
+	\
+	NumberNode *result = upcasted + 0; \
+	\
+	switch (result->type) { \
+	case FLOAT: \
+		result->value.f = upcasted[0].value.f OP upcasted[1].value.f; \
+		break; \
+	case INT: \
+		result->value.i = upcasted[0].value.i OP upcasted[1].value.i; \
+		break; \
+	default: { \
+		ERROR_TYPE = EXECUTION_ERROR; \
+		strcpy(ERROR_MSG, "Unsupported number type."); \
+		return NULL; \
+	} \
+	} \
+	result = realloc(result, sizeof(NumberNode)); \
+	return result; \
 }
 
+BINARY_FUNCTION(add, +)  // `num_add` function.
+BINARY_FUNCTION(sub, -)  // `num_sub` function.
+BINARY_FUNCTION(mul, *)  // `num_mul` function.
 
+// `num_div` function is different, it always gives a float.
+NumberNode *num_div(NumberNode lhs, NumberNode rhs)
+{
+	NumberNode *result = malloc(sizeof(NumberNode));
+	result->type = FLOAT;
+	result->value.f = num_to_float(lhs).value.f / num_to_float(rhs).value.f;
+	return result;
+}

@@ -29,6 +29,8 @@ typedef float f32;
 typedef double f64;
 typedef long double fsize;
 
+ssize ipow(ssize, usize);
+
 char *trim(char *);
 char *downcase(char *);
 

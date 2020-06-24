@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "error.h"
 #include "displays.h"
@@ -45,7 +46,7 @@ Token *new_token(TokenType type, const char *value)
 	return t;
 }
 
-TokenType char_token_type(char c, TokenType last_token_type)
+TokenType char_token_type(char c, char last_char, TokenType last_token_type)
 {
 	if (c <= '9' && c >= '0') {
 		if (last_token_type == TT_IDENTIFIER)
@@ -61,8 +62,12 @@ TokenType char_token_type(char c, TokenType last_token_type)
 	&& (last_token_type == TT_OPERATOR
 	|| last_token_type == TT_NONE))
 		return TT_NUMERIC;
-	if ((c == '.' || c == 'E')
+	if ((c == '.' || c == 'E')  // Scientific notation.
 	&& last_token_type == TT_NUMERIC)
+		return TT_NUMERIC;
+	if ((c == '+' || c == '-') && last_char == 'E')
+		return TT_NUMERIC;
+	if ((c == 'x' || c == 'o') && last_char == '0')
 		return TT_NUMERIC;
 	if (c == '(')
 		return TT_LPAREN;
@@ -93,14 +98,14 @@ Token *lex(char **source)
 	if (**source == '\0')
 		return NULL;  // No more tokens.
 
-	TokenType tt = char_token_type(**source, TT_NONE);
+	TokenType tt = char_token_type(**source, ' ', TT_NONE);
 
 	// Skip over TT_NONE tokens (spaces, tabs, etc.).
 	while (tt == TT_NONE) {
 		(*source)++;
 		if (**source == '\0')
 			return NULL;
-		tt = char_token_type(**source, tt);
+		tt = char_token_type(**source, *(*source - 1), tt);
 	}
 
 	// First of all, check if it matches an operator.
@@ -139,7 +144,10 @@ Token *lex(char **source)
 	} else {
 		while (tt == previous_tt) {
 			span++;
-			previous_tt = char_token_type(*(*source + span), previous_tt);
+			previous_tt = char_token_type(
+				*(*source + span),
+				*(*source + span - (span == 0 ? 0 : 1)),
+				previous_tt);
 		}
 	}
 
@@ -170,12 +178,64 @@ void node_into_ident(const char *str, ParseNode *node)
 	node->node.ident = *ident;
 }
 
-// TODO: Support more than just INTs.
 NumberNode *parse_number(const char *str)
 {
 	NumberNode *number = malloc(sizeof(NumberNode));
-	number->type = INT;
-	number->value.i = atoi(str);
+
+	char *exponent_ptr = strstr(str, "E");
+	char *neg_exponent_ptr = strstr(str, "E-");
+	char *decimal_point_ptr = strstr(str, ".");
+
+	// Sanity.
+	if (exponent_ptr != NULL) {
+		// No trailing 'E'.
+		if (*(exponent_ptr + 1) == '\0')
+			return NULL;
+		// No trailing 'E+' or 'E-'.
+		if ((*(exponent_ptr + 1) == '+'
+		||   *(exponent_ptr + 1) == '-')
+		&&   *(exponent_ptr + 2) == '\0')
+			return NULL;
+		// No repreated 'E' and no decimal point ('.') after 'E'.
+		if (strstr(exponent_ptr + 1, "E") != NULL
+		||  strstr(exponent_ptr + 1, ".") != NULL)
+			return NULL;
+	}
+	if (decimal_point_ptr != NULL) {
+		// No trailing decimal point ('.').
+		if (*(decimal_point_ptr + 1) == '\0')
+			return NULL;
+		// No decimal point ('.') after first decimal point.
+		if (strstr(decimal_point_ptr + 1, ".") != NULL)
+			return NULL;
+	}
+
+	// No negative exponent and no decimal point, means
+	// the number literal is certainly an integer.
+	if (neg_exponent_ptr == NULL && decimal_point_ptr == NULL) {
+		number->type = INT;
+		ssize significand = strtoll(str, NULL, 0);
+		if (exponent_ptr == NULL) { // No power-term.
+			number->value.i = significand;
+			return number;
+		}
+
+		usize exponent = strtoull(exponent_ptr + 1, NULL, 10);
+		ssize power_term = ipow(10, exponent);
+		if (power_term >= 0 && exponent <= 18) {
+			// Probably didn't overflow.
+			number->value.i = significand * power_term;
+			return number;
+		}
+		// Fallback to float.
+	}
+
+	number->type = FLOAT;
+	fsize power_term = 1;
+
+	fsize significand = strtold(str, NULL);
+	number->value.f = significand * power_term;
+
 	return number;
 }
 
@@ -188,7 +248,7 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		NumberNode *num = parse_number(token->value);
 		if (num == NULL) {
 			ERROR_TYPE = SYNTAX_ERROR;
-			sprintf(ERROR_MSG, "Malformatted number literal (`%s').",
+			sprintf(ERROR_MSG, "Malformed number literal (`%s').",
 				token->value);
 			return NULL;
 		}

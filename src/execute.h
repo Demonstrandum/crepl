@@ -34,6 +34,7 @@ typedef enum {
 	ARG, LHS, RHS
 } ParamPos;
 
+void free_datavalue(DataValue *);
 void *type_check(char *, ParamPos, DataType, DataValue *);
 DataValue *execute(Context *, const ParseNode *);
 Local *make_local(char *, DataType, void *);

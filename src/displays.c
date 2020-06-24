@@ -8,6 +8,22 @@
 #include "execute.h"
 #include "displays.h"
 
+char *display_numbernode(NumberNode num)
+{
+	char *str = malloc(sizeof(char) * 128); // Hope that's enough.
+	switch (num.type) {
+	case INT:
+		sprintf(str, "%ld", num.value.i);
+		break;
+	case FLOAT:
+		sprintf(str, "%.15LG", num.value.f);
+		break;
+	default:
+		strcpy(str, "undisplayable-number-type");
+	}
+	return str;
+}
+
 char *display_parampos(ParamPos pos)
 {
 	switch (pos) {
@@ -43,10 +59,7 @@ char *display_parsetree(const ParseNode *tree)
 		return tree->node.ident.value;
 	}
 	case NUMBER_NODE: {
-		// TODO: Check the number type (int, float, etc.).
-		char *number = malloc(sizeof(char) * 64); // Guess?
-		sprintf(number, "%ld", tree->node.number.value.i);
-		return number;
+		return display_numbernode(tree->node.number);
 	}
 	case UNARY_NODE: {
 		UnaryNode unary = tree->node.unary;
@@ -78,14 +91,13 @@ char *display_parsetree(const ParseNode *tree)
 		return binary_str;
 	}
 	default:
-		return "[Unknown Parse Node]";
+		return "[unknown-parse-node]";
 	}
 }
 
 char *display_datavalue(const DataValue *data)
 {
-	// Safe bet.
-	char *string = malloc(sizeof(char) * 512);
+	char *string;
 
 	if (data == NULL)
 		return "internal-null-pointer";
@@ -95,11 +107,20 @@ char *display_datavalue(const DataValue *data)
 		if (data->value == NULL)
 			return "number-with-null-value";
 		NumberNode *num = data->value;
-		// TODO: Handle more than just INT type.
-		sprintf(string, "%ld", num->value.i);
+		return display_numbernode(*num);
+	}
+	case T_STRING: {
+		char *inside = data->value;
+		usize len = strlen(inside);
+		string = malloc(len + 2);
+		strcpy(string + 1, inside);
+		string[0] = '"';
+		string[len + 1] = '"';
+		string[len + 2] = '\0';
 		break;
 	}
 	default:
+		string = malloc(sizeof(char) * 128); // Safe bet.
 		sprintf(string, "<%s at 0x%p>",
 				display_datatype(data->type),
 				data->value);
