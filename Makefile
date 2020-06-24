@@ -1,9 +1,9 @@
 CC := gcc
 OPT := -O3
-WARN := -Wall -Wpedantic -Wextra -Wshadow
+WARN := -Wall -Wpedantic -Wextra -Wshadow -fcompare-debug-second
 CFLAGS := $(WARN) $(OPT)
 TARGET := crepl
-OBJS := main.o prelude.o parse.o displays.o error.o execute.o
+OBJS := main.o prelude.o error.o parse.o displays.o builtin.o execute.o
 LINKS := -lm -lreadline
 
 ifeq ($(PREFIX),)
@@ -35,6 +35,9 @@ parse.o: error.o
 
 displays.o: parse.o
 	$(CC) -c $(CFLAGS) src/displays.c
+
+builtin.o:
+	$(CC) -c $(CFLAGS) src/builtin.c
 
 execute.o: parse.o error.o
 	$(CC) -c $(CFLAGS) src/execute.c

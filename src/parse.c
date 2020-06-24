@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "error.h"
+#include "displays.h"
 #include "parse.h"
 
 void free_token(Token *token)
@@ -232,6 +233,8 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		node->type = UNARY_NODE;
 		node->node.unary = *unary;
 
+		printf("Parsed prefix as: %s\n\n", display_parsetree(node));
+
 		break;
 	}
 	case TT_LPAREN: {
@@ -372,23 +375,39 @@ ParseNode *parse_expr(char **slice, u16 precedence)
 
 	ParseNode *left = parse_prefix(token, slice);
 
+	if (left == NULL)
+		return NULL;
+
 	Token *token_ahead = peek(slice);
+
 	if (token_ahead == NULL)
 		return left;
 
 	u16 current_precedence = token_precedence(token_ahead);
 	u16 previous_precedence = 0;
 
+	usize count = 0;
 	while (precedence < current_precedence) {
+		count += 1;
+		if (count > 301) {
+			ERROR_TYPE = PARSE_ERROR;
+			strcpy(ERROR_MSG, "Could not finish parsing expression.");
+			break;
+		}
 		if (current_precedence != FUNCTION_PRECEDENCE)
 			token = lex(slice);
+		else
+			token = peek(slice);
+
+		if (token == NULL)
+			break;
 
 		left = parse_infix(left, token, slice, previous_precedence);
 		if (left == NULL || **slice == '\0')
 			break;
 
 		token_ahead = peek(slice);
-		if (token == NULL)
+		if (token_ahead == NULL)
 			break;
 
 		previous_precedence = current_precedence;

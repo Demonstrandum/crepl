@@ -1,6 +1,7 @@
 #include "execute.h"
 #include "error.h"
 #include "parse.h"
+#include "builtin.h"
 #include "displays.h"
 
 /// Takes in an execution context (ctx) and a
@@ -33,13 +34,9 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 			NumberNode *r_num = type_check("+", RHS, T_NUMBER, rhs);
 			if (l_num == NULL || r_num == NULL)
 				return NULL;
-			// TODO: Handle more numbers tham just INTs.
-			NumberNode *result_num = malloc(sizeof(NumberNode));
-			memcpy(result_num, l_num, sizeof(NumberNode));
 			// Finally, the addition is performed.
-			result_num->value.i = l_num->value.i + r_num->value.i;
 			data->type = T_NUMBER;
-			data->value = result_num;
+			data->value = num_add(*l_num, *r_num);
 		} else if (strcmp(op, "-") == 0) {
 
 		} else {

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <wchar.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -15,10 +16,10 @@
 
 static const char *PROMPT = "::> ";
 
-void sigint_handle(int _)
+void sigint_handle(int sig)
 {
 	printf("\b\b  ");  // Obsucre '^C' output.
-	printf("\nInterrupted, [Ctrl-D] to stop inputting.\n");
+	printf("\nInterrupted (%d), [Ctrl-D] to stop inputting.\n", sig);
     rl_on_new_line();
 	rl_replace_line("", 0);
     rl_redisplay();
@@ -33,9 +34,16 @@ int main(int argc, char **argv)
 	puts(" (" COMPILER ") (" __DATE__ ")");
 	puts("Type \"exit\" or [Ctrl-D] (i.e. EOF) to quit.");
 
+	bool verbose = false;
+	// Parse command line arguments.
+	for (int i = 0; i < argc; ++i) {
+		if (strcmp(argv[i], "-v") == 0)
+			verbose = true;
+	}
+
 	// Configure readline.
 	rl_clear_signals();
-	rl_bind_key('\t', rl_complete);
+	rl_bind_key('\t', rl_insert);
 	signal(SIGINT, sigint_handle);
 
 	// Create or fetch history file.
@@ -45,11 +53,15 @@ int main(int argc, char **argv)
 	if ((tmp = getenv("XDG_CACHE_HOME")) != NULL)
 		strcpy(cache_loc, tmp);
 	else if ((tmp = getenv("HOME")) != NULL)
-		sprintf(cache_loc, "%s/.cache/", tmp);
+		sprintf(cache_loc, "%s/.cache", tmp);
 
 	mkdir(cache_loc, 0777);
 	strcat(cache_loc, "/crepl.history");
 	read_history(cache_loc);
+
+	if (verbose) {
+		printf("Reading history from `%s'.\n", cache_loc);
+	}
 
 	Context *ctx = init_context();
 
@@ -73,6 +85,11 @@ int main(int argc, char **argv)
 			continue;
 		}
 
+		printf("\033[%luC\033[1A",
+			strlen(PROMPT)
+			+ strlen(response));
+		printf(" ≡ %s\n", display_parsetree(tree));
+
 		DataValue *result = execute(ctx, tree);
 
 		if (result == NULL || ERROR_TYPE != NO_ERROR) {
@@ -80,13 +97,10 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		printf("\033[%luC\033[1A", strlen(PROMPT) + strlen(response));
-		printf(" ≡ %s\n", display_parsetree(tree));
 		printf("#=> %s\n", display_datavalue(result));
 
 		//free_datavalue(result);
 		free_parsenode(tree);
-		free(response);
 	} while (true);
 
 	write_history(cache_loc);

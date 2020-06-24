@@ -60,7 +60,7 @@ static const Operator KNOWN_OPERATORS[] = {
 	{ ">", 4, LEFT_ASSOC, INFIX },
 	{ "<", 4, LEFT_ASSOC, INFIX },
 	{ "=", 2, RIGHT_ASSOC, INFIX },
-	{ ",", 1, LEFT_ASSOC, INFIX },
+	{ ",", 1, RIGHT_ASSOC, INFIX },
 };
 
 // Parse tree nodes:
