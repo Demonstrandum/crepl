@@ -12,6 +12,8 @@ const char *error_name(error_t err)
 		return "Syntax Error";
 	case PARSE_ERROR:
 		return "Grammar Error";
+	case TYPE_ERROR:
+		return "Type Error";
 	case EXECUTION_ERROR:
 		return "Error while executing";
 	default:
@@ -26,6 +28,8 @@ char ERROR_MSG[256] = DEFAULT_ERROR_MSG;
 
 void handle_error()
 {
+	if (ERROR_TYPE == NO_ERROR)
+		return;
 	// Display error.
 	printf("\033[31;1m%s\033[0m: %s\n",
 		error_name(ERROR_TYPE),

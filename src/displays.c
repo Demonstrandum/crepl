@@ -4,7 +4,34 @@
 
 #include "prelude.h"
 #include "parse.h"
+#include "execute.h"
 #include "displays.h"
+
+char *display_parampos(ParamPos pos)
+{
+	switch (pos) {
+	case LHS:
+		return "left-hand-side";
+	case RHS:
+		return "right-hand-side";
+	default:
+		return "argument";
+	}
+}
+
+char *display_datatype(DataType type)
+{
+	switch (type) {
+	case T_NUMBER:
+		return "number";
+	case T_FUNCTION_PTR:
+		return "function";
+	case T_STRING:
+		return "text-string";
+	default:
+		return "unknown-type";
+	}
+}
 
 char *display_parsetree(const ParseNode *tree)
 {
@@ -52,4 +79,24 @@ char *display_parsetree(const ParseNode *tree)
 	default:
 		return "[Unknown Parse Node]";
 	}
+}
+
+char *display_datavalue(const DataValue *data)
+{
+	// Safe bet.
+	char *string = malloc(sizeof(char) * 512);
+
+	switch (data->type) {
+	case T_NUMBER: {
+		NumberNode *num = data->value;
+		// TODO: Handle more than just INT type.
+		sprintf(string, "%ld", num->value.i);
+		break;
+	}
+	default:
+		sprintf(string, "<%s at 0x%p>",
+				display_datatype(data->type),
+				data->value);
+	}
+	return string;
 }

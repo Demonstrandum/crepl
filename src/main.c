@@ -10,6 +10,7 @@
 #include "prelude.h"
 #include "error.h"
 #include "parse.h"
+#include "execute.h"
 #include "displays.h"
 
 static const char *PROMPT = "::> ";
@@ -34,7 +35,7 @@ int main(int argc, char **argv)
 
 	// Configure readline.
 	rl_clear_signals();
-	rl_bind_key('\t', rl_insert);
+	rl_bind_key('\t', rl_complete);
 	signal(SIGINT, sigint_handle);
 
 	// Create or fetch history file.
@@ -49,6 +50,8 @@ int main(int argc, char **argv)
 	mkdir(cache_loc, 0777);
 	strcat(cache_loc, "/crepl.history");
 	read_history(cache_loc);
+
+	Context *ctx = init_context();
 
 	char *response = NULL;
 	do {
@@ -65,18 +68,25 @@ int main(int argc, char **argv)
 		// Try to lex & parse the input.
 		ParseNode *tree = parse(response);
 
-		if (ERROR_TYPE != NO_ERROR) {
+		if (tree == NULL || ERROR_TYPE != NO_ERROR) {
 			handle_error();
 			continue;
 		}
 
-		if (tree == NULL) continue;
+		DataValue *result = execute(ctx, tree);
+
+		if (result == NULL || ERROR_TYPE != NO_ERROR) {
+			handle_error();
+			continue;
+		}
 
 		printf("\033[%luC\033[1A", strlen(PROMPT) + strlen(response));
 		printf(" ≡ %s\n", display_parsetree(tree));
-		printf("#=> %s\n", response);
+		printf("#=> %s\n", display_datavalue(result));
 
+		//free_datavalue(result);
 		free_parsenode(tree);
+		free(response);
 	} while (true);
 
 	write_history(cache_loc);

@@ -1,5 +1,7 @@
 CC := gcc
-CFLAGS := -Wall -Wpedantic
+OPT := -O3
+WARN := -Wall -Wpedantic -Wextra -Wshadow
+CFLAGS := $(WARN) $(OPT)
 TARGET := crepl
 OBJS := main.o prelude.o parse.o displays.o error.o execute.o
 LINKS := -lm -lreadline
@@ -11,8 +13,11 @@ endif
 all: clean $(TARGET)
 	@printf "\033[1mBuilt \`$(TARGET)' successfully.\033[0m\n"
 
+debug: $(OBJS)
+	$(CC) -Og -o $(TARGET) $(LINKS) $(OBJS)
+
 $(TARGET): $(OBJS)
-	$(CC) -o $(TARGET) $(LINKS) $(OBJS)
+	$(CC) $(OPT) -o $(TARGET) $(LINKS) $(OBJS)
 
 install: $(TARGET)
 	@echo "Installing to $(PREFIX)/bin/$(TARGET)."
@@ -24,7 +29,6 @@ main.o: prelude.o parse.o error.o
 
 prelude.o: error.o
 	$(CC) -c $(CFLAGS) src/prelude.c
-
 
 parse.o: error.o
 	$(CC) -c $(CFLAGS) src/parse.c

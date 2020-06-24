@@ -4,6 +4,7 @@ typedef enum {
 	NO_ERROR,
 	SYNTAX_ERROR,
 	PARSE_ERROR,
+	TYPE_ERROR,
 	EXECUTION_ERROR,
 } error_t;
 
