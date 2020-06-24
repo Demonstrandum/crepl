@@ -87,8 +87,13 @@ char *display_datavalue(const DataValue *data)
 	// Safe bet.
 	char *string = malloc(sizeof(char) * 512);
 
+	if (data == NULL)
+		return "internal-null-pointer";
+
 	switch (data->type) {
 	case T_NUMBER: {
+		if (data->value == NULL)
+			return "number-with-null-value";
 		NumberNode *num = data->value;
 		// TODO: Handle more than just INT type.
 		sprintf(string, "%ld", num->value.i);

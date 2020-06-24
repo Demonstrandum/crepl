@@ -68,12 +68,14 @@ DataValue *wrap_data(DataType type, void *value)
 void *type_check(char *function_name, ParamPos pos,
 	DataType type, DataValue *value)
 {
-	if (value->type == type) {
+	if (value != NULL
+	&& value->value != NULL
+	&& value->type == type)
 		return value->value;
-	}
+
 	ERROR_TYPE = TYPE_ERROR;
-	sprintf(ERROR_MSG, "Wrong type for %s of `%s' operation,"
-		" needed type of `%s'.",
+	sprintf(ERROR_MSG, "Wrong type for %s of `%s' operation,\n"
+		"  needed type of `%s'.",
 		display_parampos(pos),
 		function_name,
 		display_datatype(type));
