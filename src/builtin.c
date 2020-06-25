@@ -1,3 +1,4 @@
+#include "defaults.h"
 #include "builtin.h"
 
 NumberNode num_to_float(NumberNode num)
@@ -75,20 +76,46 @@ NumberNode *upcast_pair(NumberNode lhs, NumberNode rhs)
 	return pair;
 }
 
-DataValue *builtin_sin(DataValue input)
-{
-	NumberNode *num = type_check("sin", ARG, T_NUMBER, &input);
-	if (num == NULL)
-		return NULL;
-	DataValue *result = wrap_data(T_NUMBER, num);
-
-	NumberNode tmp = num_to_float(*num);
-	memcpy(num, &tmp, sizeof(NumberNode));
-	num->value.f = sin(num->value.f);
-	num->type = FLOAT;
-	result->value = num;
-	return result;
+#define MATH_WRAPPER(NAME, FUNC)\
+DataValue *builtin_ ##NAME (DataValue input) \
+{ \
+	NumberNode *num = type_check(#NAME, ARG, T_NUMBER, &input); \
+	\
+	if (num == NULL) \
+		return NULL; \
+	\
+	NumberNode *new_num = malloc(sizeof(NumberNode)); \
+	\
+	NumberNode tmp = num_to_float(*num); \
+	tmp.value.f = FUNC(tmp.value.f); \
+	\
+	memcpy(new_num, &tmp, sizeof(NumberNode)); \
+	DataValue *result = wrap_data(T_NUMBER, new_num); \
+	return result; \
 }
+
+MATH_WRAPPER(sin, sinl)
+MATH_WRAPPER(sinh, sinhl)
+MATH_WRAPPER(cos, cosl)
+MATH_WRAPPER(cosh, coshl)
+MATH_WRAPPER(tan, tanl)
+MATH_WRAPPER(tanh, tanhl)
+MATH_WRAPPER(exp, expl)
+MATH_WRAPPER(abs, fabsl)
+MATH_WRAPPER(log, log10l)
+MATH_WRAPPER(log2, log2l)
+MATH_WRAPPER(ln, logl)
+MATH_WRAPPER(sqrt, sqrtl)
+MATH_WRAPPER(cbrt, cbrtl)
+MATH_WRAPPER(acos, acosl)
+MATH_WRAPPER(acosh, acoshl)
+MATH_WRAPPER(asin, asinl)
+MATH_WRAPPER(asinh, asinhl)
+MATH_WRAPPER(atan, atanl)
+MATH_WRAPPER(atanh, atanhl)
+// TODO: atan2, hypot
+MATH_WRAPPER(ceil, ceil)
+MATH_WRAPPER(floor, floor)
 
 DataValue *builtin_factorial(DataValue input)
 {
@@ -103,27 +130,23 @@ DataValue *builtin_factorial(DataValue input)
 	}
 
 	NumberNode tmp = num_to_int(*num);
-	memcpy(num, &tmp, sizeof(NumberNode));
+	NumberNode *new_num = malloc(sizeof(NumberNode));
+	memcpy(new_num, &tmp, sizeof(NumberNode));
 
-	DataValue *result = wrap_data(T_NUMBER, num);
-	if (num->value.i == 0) {
-		num->value.i = 1;
-		result->value = num;
+	DataValue *result = wrap_data(T_NUMBER, new_num);
+	if (new_num->value.i == 0) {
+		new_num->value.i = 1;
+		result->value = new_num;
 		return result;
 	}
-	ssize i = num->value.i - 1;
+	ssize i = new_num->value.i - 1;
 	while (i > 1) {
-		num->value.i *= i;
+		new_num->value.i *= i;
 		--i;
 	}
-	result->value = num;
+	result->value = new_num;
 	return result;
 }
-
-FnPtr builtin_fns[] = {
-	{ builtin_sin },
-	{ builtin_factorial },
-};
 
 #define BINARY_FUNCTION(NAME, OP) \
 NumberNode *num_ ## NAME (NumberNode lhs, NumberNode rhs) \
@@ -163,3 +186,31 @@ NumberNode *num_div(NumberNode lhs, NumberNode rhs)
 	result->value.f = num_to_float(lhs).value.f / num_to_float(rhs).value.f;
 	return result;
 }
+
+NumberNode *num_pow(NumberNode lhs, NumberNode rhs)
+{
+	NumberNode *upcasted = upcast_pair(lhs, rhs);
+	if (upcasted == NULL)
+		return NULL;
+
+	NumberNode *result = upcasted + 0;
+
+	switch (result->type) {
+	case FLOAT:
+		result->value.f = powl(upcasted[0].value.f, upcasted[1].value.f);
+		break;
+	case INT:
+		result->value.i = upcasted[1].value.i < 0
+			? ((fsize)1) / ipow(upcasted[0].value.i, -upcasted[1].value.i)
+			:  ipow(upcasted[0].value.i, upcasted[1].value.i);
+		break;
+	default: {
+		ERROR_TYPE = EXECUTION_ERROR;
+		strcpy(ERROR_MSG, "Unsupported number type.");
+		return NULL;
+	}
+	}
+	result = realloc(result, sizeof(NumberNode));
+	return result;
+}
+

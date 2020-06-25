@@ -26,3 +26,7 @@ make  # Builds and compiles the project.
 sudo make install  # Installs the program system wide.
 ```
 
+## TODO
+ - [ ] User defined functions.
+ - [ ] Garbage collection.
+ - [ ] Extend numbers to include “Big Numbers” (“Big Integers” and “Big Decimals”/Rationals), numbers a currently limited to ~80bit floats and pointer-sized (likely 64bit) integeres.

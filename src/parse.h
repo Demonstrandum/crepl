@@ -1,5 +1,7 @@
 #pragma once
 
+#include "defaults.h"
+
 // Tokens:
 typedef enum {
 	TT_LPAREN, TT_RPAREN,
@@ -42,7 +44,7 @@ static const Operator KNOWN_OPERATORS[] = {
 	// 3 characters long.
 	{ "not", 8, RIGHT_ASSOC, PREFIX },
 	// 2 characters long.
-	{ "**", 7, RIGHT_ASSOC, INFIX },
+	{ "**", 10, RIGHT_ASSOC, INFIX },
 	{ "<=", 4, LEFT_ASSOC, INFIX },
 	{ ">=", 4, LEFT_ASSOC, INFIX },
 	{ "==", 3, LEFT_ASSOC, INFIX },
@@ -52,7 +54,7 @@ static const Operator KNOWN_OPERATORS[] = {
 	{ "+", 10, RIGHT_ASSOC, PREFIX },
 	{ "¬", 10, RIGHT_ASSOC, PREFIX },
 	{ "!", 10, LEFT_ASSOC, POSTFIX },
-	{ "^", 7, RIGHT_ASSOC, INFIX },
+	{ "^", 10, RIGHT_ASSOC, INFIX },
 	{ "*", 6, LEFT_ASSOC, INFIX },
 	{ "/", 6, LEFT_ASSOC, INFIX },
 	{ "+", 5, LEFT_ASSOC, INFIX },
@@ -128,4 +130,4 @@ NumberNode *parse_number(const char *);
 ParseNode *parse_prefix(const Token *, char **);
 ParseNode *parse_infix(const ParseNode *, const Token *, char **, u16);
 ParseNode *parse_expr(char **, u16);
-ParseNode *parse(char *);
+ParseNode *parse(const char *);

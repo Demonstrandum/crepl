@@ -3,7 +3,7 @@ OPT := -O3
 WARN := -Wall -Wpedantic -Wextra -Wshadow -fcompare-debug-second
 CFLAGS := $(WARN) $(OPT)
 TARGET := crepl
-OBJS := main.o prelude.o error.o parse.o displays.o builtin.o execute.o
+OBJS := main.o defaults.o error.o parse.o displays.o builtin.o execute.o prelude.o
 LINKS := -lm -lreadline
 
 ifeq ($(PREFIX),)
@@ -24,10 +24,13 @@ install: $(TARGET)
 	install -d $(PREFIX)/bin
 	install -m 755 $(TARGET) $(PREFIX)/bin
 
-main.o: prelude.o parse.o error.o
+main.o: defaults.o parse.o error.o
 	$(CC) -c $(CFLAGS) src/main.c
 
-prelude.o: error.o
+defaults.o: error.o
+	$(CC) -c $(CFLAGS) src/defaults.c
+
+prelude.o:
 	$(CC) -c $(CFLAGS) src/prelude.c
 
 parse.o: error.o
@@ -39,7 +42,7 @@ displays.o: parse.o
 builtin.o:
 	$(CC) -c $(CFLAGS) src/builtin.c
 
-execute.o: parse.o error.o
+execute.o: parse.o error.o prelude.o
 	$(CC) -c $(CFLAGS) src/execute.c
 
 error.o:

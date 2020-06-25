@@ -1,6 +1,6 @@
 #pragma once
 
-#include "prelude.h"
+#include "defaults.h"
 #include "parse.h"
 
 typedef enum {
@@ -22,7 +22,7 @@ typedef struct {
 } FnPtr;
 
 typedef struct {
-	char *name;
+	const char *name;
 	DataValue value;
 } Local;
 
@@ -30,7 +30,7 @@ struct _context;
 
 typedef struct _context {
 	struct _context *superior;
-	char *function;
+	const char *function;
 	// `locals` works as a dynamic array;
 	usize locals_count;
 	usize locals_capacity;
@@ -42,12 +42,12 @@ typedef enum {
 } ParamPos;
 
 void free_datavalue(DataValue *);
-void *type_check(char *, ParamPos, DataType, DataValue *);
+void *type_check(const char *, ParamPos, DataType, const DataValue *);
 DataValue *execute(Context *, const ParseNode *);
 DataValue *wrap_data(DataType, void *);
-Local *make_local(char *, DataType, void *);
-void bind_local(Context *, char *name, DataType, void*);
+Local *make_local(const char *, DataType, void *);
+void bind_local(Context *, const char *, DataType, void *);
 void bind_builtin_functions(Context *);
 Context *init_context();
 Context *base_context();
-Context *make_context(char *, Context *);
+Context *make_context(const char *, Context *);

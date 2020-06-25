@@ -3,7 +3,6 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "prelude.h"
 #include "parse.h"
 #include "execute.h"
 #include "displays.h"

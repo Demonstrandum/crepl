@@ -1,5 +1,3 @@
-#include "prelude.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -500,7 +498,11 @@ ParseNode *parse_expr(char **slice, u16 precedence)
 	return left;
 }
 
-ParseNode *parse(char *source)
+ParseNode *parse(const char *source)
 {
-	return parse_expr(&source, 0);
+	char *stepper = strdup(source);
+	char *start = stepper;
+	ParseNode *tree = parse_expr(&stepper, 0);
+	free(start);
+	return tree;
 }

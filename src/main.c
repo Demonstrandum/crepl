@@ -8,7 +8,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "prelude.h"
+#include "defaults.h"
 #include "error.h"
 #include "parse.h"
 #include "execute.h"

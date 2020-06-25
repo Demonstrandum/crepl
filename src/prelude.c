@@ -1,39 +1,30 @@
 #include "prelude.h"
 
-ssize ipow(ssize base, usize exp)
+char *PRELUDE_STATEMENTS[] = {
+	"tau = 2pi",
+	"phi = 1.61803398875",
+};
+
+void execute_prelude(Context *ctx)
 {
-    ssize result = 1;
-    do {
-        if (exp & 1)
-            result *= base;
-        exp >>= 1;
-        if (!exp)
-            break;
-        base *= base;
-    } while (true);
+	for (usize i = 0; i < len(PRELUDE_STATEMENTS); ++i) {
+		const char *stmt_str = PRELUDE_STATEMENTS[i];
 
-    return result;
-}
+		ParseNode *stmt = parse(stmt_str);
+		if (stmt == NULL || ERROR_TYPE != NO_ERROR)
+			goto fatality;
 
-char *trim(char *str)
-{
-	char *p = strdup(str);
-	while (isspace(*p))
-        ++p;
+		DataValue *result = execute(ctx, stmt);
+		if (result == NULL || ERROR_TYPE != NO_ERROR)
+			goto fatality;
 
-	char *end = p + strlen(p) - 1;
-    while (end > p && isspace(*end))
-        --end;
+		free(stmt);
+	}
+	return;
 
-    *(end + 1) = '\0';
-    return p;
-}
-
-
-char *downcase(char *str)
-{
-	char *p = strdup(str);
-	char *start = p;
-	for (; *p; ++p) *p = tolower(*p);
-	return start;
+fatality:
+	handle_error();
+	fprintf(stderr, "\nFATAL: Prelude failed to run without error.\n");
+	fprintf(stderr, "ABORTING\n!");
+	exit(1);
 }
