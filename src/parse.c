@@ -386,7 +386,13 @@ ParseNode *parse_infix(const ParseNode *left,
 			unary->is_postfix = true;
 		} else { // Function call.
 			unary->callee = left;
-			unary->operand = parse_expr(rest, FUNCTION_PRECEDENCE);
+			// The minus one (- 1) makes function application right
+			// associative, this is unconventional, and makes applications
+			// on functions that return functions not very pretty.
+			// However, it makes for more natural syntax for multiplication
+			// by juxtaposition.
+			// e.g.  3 sin 2  =>  (3 (sin 2)) vs ((3 sin) 2)  [<- error]
+			unary->operand = parse_expr(rest, FUNCTION_PRECEDENCE - 1);
 			unary->is_postfix = false;
 		}
 
