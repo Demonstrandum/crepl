@@ -30,7 +30,10 @@ DataValue *builtin_asin(DataValue);
 DataValue *builtin_asinh(DataValue);
 DataValue *builtin_atan(DataValue);
 DataValue *builtin_atanh(DataValue);
+DataValue *builtin_ceil(DataValue);
+DataValue *builtin_floor(DataValue);
 DataValue *builtin_factorial(DataValue);
+DataValue *builtin_neg(DataValue);
 
 NumberNode *num_add(NumberNode, NumberNode);
 NumberNode *num_sub(NumberNode, NumberNode);
@@ -72,7 +75,11 @@ static const struct _func_name_pair builtin_fns[] = {
 	{ "arctan", { builtin_atan } },
 	FUNC_PAIR(atanh),
 	{ "arctanh", { builtin_atanh } },
+	FUNC_PAIR(ceil),
+	FUNC_PAIR(floor),
 	FUNC_PAIR(factorial),
 	{ "!", { builtin_factorial } },
+	FUNC_PAIR(neg),
+	{ "-", { builtin_neg } },
 };
 

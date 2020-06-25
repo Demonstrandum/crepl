@@ -312,8 +312,6 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		node->type = UNARY_NODE;
 		node->node.unary = *unary;
 
-		printf("Parsed prefix as: %s\n\n", display_parsetree(node));
-
 		break;
 	}
 	case TT_LPAREN: {

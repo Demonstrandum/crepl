@@ -117,31 +117,60 @@ MATH_WRAPPER(atanh, atanhl)
 MATH_WRAPPER(ceil, ceil)
 MATH_WRAPPER(floor, floor)
 
+DataValue *builtin_neg(DataValue input)
+{
+	NumberNode *num = type_check("-", RHS, T_NUMBER, &input);
+	if (num == NULL)
+		return NULL;
+	NumberNode *new_num = malloc(sizeof(NumberNode));
+	memcpy(new_num, num, sizeof(NumberNode));
+	switch (new_num->type) {
+	case INT: {
+		new_num->value.i *= -1;
+		break;
+	}
+	case FLOAT: {
+		new_num->value.f *= -1.0f;
+		break;
+	}
+	default: {
+		ERROR_TYPE = TYPE_ERROR;
+		strcpy(ERROR_MSG, "Unsupported number type.");
+		return NULL;
+	}
+	}
+	DataValue *result = wrap_data(T_NUMBER, new_num);
+	return result;
+}
+
 DataValue *builtin_factorial(DataValue input)
 {
 	NumberNode *num = type_check("!", LHS, T_NUMBER, &input);
 	if (num == NULL)
 		return NULL;
 
-	if (num->type != INT || num->value.i < 0) {
+	f32 integral = 0;
+	f32 fractional = modff(num->value.f, &integral);
+	if ((num->type == FLOAT && (fractional != 0 || num->value.f < 0))
+	||  (num->type == INT && num->value.i < 0)) {
 		ERROR_TYPE = EXECUTION_ERROR;
 		strcpy(ERROR_MSG,
 			"factorial (`!') is only defined for positve integers.");
 	}
 
-	NumberNode tmp = num_to_int(*num);
+	NumberNode tmp = num_to_float(*num);
 	NumberNode *new_num = malloc(sizeof(NumberNode));
 	memcpy(new_num, &tmp, sizeof(NumberNode));
 
 	DataValue *result = wrap_data(T_NUMBER, new_num);
-	if (new_num->value.i == 0) {
-		new_num->value.i = 1;
+	if (new_num->value.f == 0) {
+		new_num->value.f = 1;
 		result->value = new_num;
 		return result;
 	}
-	ssize i = new_num->value.i - 1;
+	ssize i = new_num->value.f - 1;
 	while (i > 1) {
-		new_num->value.i *= i;
+		new_num->value.f *= i;
 		--i;
 	}
 	result->value = new_num;

@@ -31,7 +31,7 @@ void handle_error()
 	if (ERROR_TYPE == NO_ERROR)
 		return;
 	// Display error.
-	printf("\033[31;1m%s\033[0m: %s\n",
+	fprintf(stderr, "\033[31;1m%s\033[0m: %s\n",
 		error_name(ERROR_TYPE),
 		ERROR_MSG);
 	// Reset error values.

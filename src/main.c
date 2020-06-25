@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 		printf("\033[%luC\033[1A",
 			strlen(PROMPT)
 			+ strlen(response));
-		printf("\033[2m ≡ %s\n\033[0m", display_parsetree(tree));
+		printf("\033[2m ≡ %s\033[0m\n", display_parsetree(tree));
 
 		DataValue *result = execute(ctx, tree);
 
