@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 		printf("Reading history from `%s'.\n", cache_loc);
 	}
 
-	Context *ctx = init_context();
+	Context *ctx = base_context();
 
 	char *response = NULL;
 	do {

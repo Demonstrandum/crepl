@@ -75,6 +75,56 @@ NumberNode *upcast_pair(NumberNode lhs, NumberNode rhs)
 	return pair;
 }
 
+DataValue *builtin_sin(DataValue input)
+{
+	NumberNode *num = type_check("sin", ARG, T_NUMBER, &input);
+	if (num == NULL)
+		return NULL;
+	DataValue *result = wrap_data(T_NUMBER, num);
+
+	NumberNode tmp = num_to_float(*num);
+	memcpy(num, &tmp, sizeof(NumberNode));
+	num->value.f = sin(num->value.f);
+	num->type = FLOAT;
+	result->value = num;
+	return result;
+}
+
+DataValue *builtin_factorial(DataValue input)
+{
+	NumberNode *num = type_check("!", LHS, T_NUMBER, &input);
+	if (num == NULL)
+		return NULL;
+
+	if (num->type != INT || num->value.i < 0) {
+		ERROR_TYPE = EXECUTION_ERROR;
+		strcpy(ERROR_MSG,
+			"factorial (`!') is only defined for positve integers.");
+	}
+
+	NumberNode tmp = num_to_int(*num);
+	memcpy(num, &tmp, sizeof(NumberNode));
+
+	DataValue *result = wrap_data(T_NUMBER, num);
+	if (num->value.i == 0) {
+		num->value.i = 1;
+		result->value = num;
+		return result;
+	}
+	ssize i = num->value.i - 1;
+	while (i > 1) {
+		num->value.i *= i;
+		--i;
+	}
+	result->value = num;
+	return result;
+}
+
+FnPtr builtin_fns[] = {
+	{ builtin_sin },
+	{ builtin_factorial },
+};
+
 #define BINARY_FUNCTION(NAME, OP) \
 NumberNode *num_ ## NAME (NumberNode lhs, NumberNode rhs) \
 { \

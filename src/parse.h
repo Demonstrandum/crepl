@@ -123,6 +123,7 @@ void free_parsenode(ParseNode *);
 Token *lex(char **);
 Token *peek(char **);
 
+NumberNode *make_number(NumberType, void *);
 NumberNode *parse_number(const char *);
 ParseNode *parse_prefix(const Token *, char **);
 ParseNode *parse_infix(const ParseNode *, const Token *, char **, u16);

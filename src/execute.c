@@ -4,7 +4,9 @@
 #include "builtin.h"
 #include "displays.h"
 
-#define BINARY_OPERATION(OPERATION) do { \
+#include <math.h>
+
+#define NUMERICAL_BINARY_OPERATION(OPERATION) do { \
 	NumberNode *l_num = type_check("+", LHS, T_NUMBER, lhs); \
 	NumberNode *r_num = type_check("+", RHS, T_NUMBER, rhs); \
 	if (l_num == NULL || r_num == NULL)    \
@@ -35,34 +37,56 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 		// throw an execution error.
 		char *ident_name = stmt->node.ident.value;
 
-		free(data);
-		data = NULL;
-
 		Context *current_ctx = ctx;
 		while (current_ctx != NULL) {
 			for (usize i = 0; i < current_ctx->locals_count; ++i) {
 				Local *local = &current_ctx->locals[i];
 				if (strcmp(local->name, ident_name) == 0) {
-					data = &local->value;
+					*data = local->value;
 					goto finished_search;
 				}
 			}
 			current_ctx = current_ctx->superior;
 		}
 
+		ERROR_TYPE = EXECUTION_ERROR;
+		sprintf(ERROR_MSG, "Could not find variable `%s'\n"
+			"  in any local or superior scope.", ident_name);
+		return NULL;
+
 finished_search:
-		if (data == NULL) {
-			ERROR_TYPE = EXECUTION_ERROR;
-			sprintf(ERROR_MSG, "Could not find variable `%s'\n"
-				"  in any local or superior scope.", ident_name);
-			return NULL;
-		}
 		break;
 	}
 	case NUMBER_NODE: {
 		data->type = T_NUMBER;
 		data->value = malloc(sizeof(NumberNode));
 		memcpy(data->value, &stmt->node.number, sizeof(NumberNode));
+		break;
+	}
+	case UNARY_NODE: { // Functions, essentially.
+		DataValue *callee  = execute(ctx, stmt->node.unary.callee);
+		DataValue *operand = execute(ctx, stmt->node.unary.operand);
+
+		if (callee == NULL || operand == NULL)
+			return NULL;
+
+		// Juxtaposition of numbers, implies multiplication.
+		if (callee->type == T_NUMBER && operand->type == T_NUMBER) {
+			data->type = T_NUMBER;
+			data->value = num_mul(*(NumberNode *)callee->value,
+				*(NumberNode *)operand->value);
+			break;
+		}
+
+		// Otheriwse, we expect a function pointer as callee.
+		FnPtr *func = type_check("function", ARG, T_FUNCTION_PTR, callee);
+		if (func == NULL)
+			return NULL;
+
+		FUNC_PTR(fn) = func->fn;
+		free(data);
+		data = fn(*operand);
+
 		break;
 	}
 	case BINARY_NODE: {
@@ -78,13 +102,13 @@ finished_search:
 		DataValue *rhs = execute(ctx, stmt->node.binary.right);
 
 		if (strcmp(op, "+") == 0) {
-			BINARY_OPERATION(add);
+			NUMERICAL_BINARY_OPERATION(add);
 		} else if (strcmp(op, "-") == 0) {
-			BINARY_OPERATION(sub);
+			NUMERICAL_BINARY_OPERATION(sub);
 		} else if (strcmp(op, "*") == 0) {
-			BINARY_OPERATION(mul);
+			NUMERICAL_BINARY_OPERATION(mul);
 		} else if (strcmp(op, "/") == 0) {
-			BINARY_OPERATION(div);
+			NUMERICAL_BINARY_OPERATION(div);
 		} else {
 			ERROR_TYPE = EXECUTION_ERROR;
 			sprintf(ERROR_MSG, "Do not know how to evaluate"
@@ -140,6 +164,25 @@ Local *make_local(char *name, DataType type, void *value)
 	return local;
 }
 
+void bind_local(Context *ctx, char *name, DataType type, void *value)
+{
+	Local *local = make_local(name, type, value);
+	ctx->locals[ctx->locals_count] = *local;
+	++ctx->locals_count;
+}
+
+void bind_builtin_functions(Context *ctx)
+{
+	bind_local(ctx, "sin", T_FUNCTION_PTR, &builtin_fns[0]);
+	bind_local(ctx,   "!", T_FUNCTION_PTR, &builtin_fns[1]);
+}
+
+void bind_default_globals(Context *ctx)
+{
+	fsize pi = M_PI;
+	bind_local(ctx, "pi", T_NUMBER, make_number(FLOAT, &pi));
+}
+
 Context *init_context()
 {
 	Context *ctx = malloc(sizeof(Context));
@@ -157,10 +200,18 @@ Context *init_context()
 	// name of the function/scope.
 	Local *scope_name = make_local(
 		"__this_scope", T_STRING, ctx->function);
-	ctx->locals = scope_name;
+	ctx->locals[0] = *scope_name;
 	// ^ Sets the first variable, default in every scope
 	// (good for debuggin purposes).
 
+	return ctx;
+}
+
+Context *base_context()
+{
+	Context *ctx = init_context();
+	bind_default_globals(ctx);
+	bind_builtin_functions(ctx);
 	return ctx;
 }
 

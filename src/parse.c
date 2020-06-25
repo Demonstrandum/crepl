@@ -178,6 +178,27 @@ void node_into_ident(const char *str, ParseNode *node)
 	node->node.ident = *ident;
 }
 
+NumberNode *make_number(NumberType type, void *val)
+{
+	NumberNode *num = malloc(sizeof(NumberNode));
+	num->type = type;
+	num->value.i = -1;
+	switch (type) {
+	case INT: {
+		num->value.i = *(ssize *)val;
+		break;
+	}
+	case FLOAT: {
+		num->value.f = *((fsize *)val);
+		break;
+	}
+	default:
+		printf("Never get here!\n\n");
+		break;
+	}
+	return num;
+}
+
 NumberNode *parse_number(const char *str)
 {
 	NumberNode *number = malloc(sizeof(NumberNode));
