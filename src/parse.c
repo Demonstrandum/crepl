@@ -385,7 +385,10 @@ ParseNode *parse_infix(const ParseNode *left,
 			unary->callee = node;
 			unary->operand = left;
 			unary->is_postfix = true;
-		} else { // Function call.
+		} else { // Function call, probably.
+			if (token->type == TT_OPERATOR)
+				return NULL; // Not a real operator, not a function.
+
 			unary->callee = left;
 			// The minus one (- 1) makes function application right
 			// associative, this is unconventional, and makes applications
@@ -394,6 +397,8 @@ ParseNode *parse_infix(const ParseNode *left,
 			// by juxtaposition.
 			// e.g.  3 sin 2  =>  (3 (sin 2)) vs ((3 sin) 2)  [<- error]
 			unary->operand = parse_expr(rest, FUNCTION_PRECEDENCE - 1);
+			if (unary->operand == NULL)
+				return NULL;
 			unary->is_postfix = false;
 		}
 
@@ -498,8 +503,10 @@ ParseNode *parse_expr(char **slice, u16 precedence)
 		current_precedence = token_precedence(token_ahead);
 	}
 
-	free_token((Token *)token_ahead);
-	free_token((Token *)token);
+	if (token_ahead != NULL)
+		free_token((Token *)token_ahead);
+	if (token != NULL)
+		free_token((Token *)token);
 	return left;
 }
 

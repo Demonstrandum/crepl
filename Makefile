@@ -13,6 +13,7 @@ endif
 all: clean $(TARGET)
 	@printf "\033[1mBuilt \`$(TARGET)' successfully.\033[0m\n"
 
+debug: CFLAGS := $(WARN) -Og
 debug: $(OBJS)
 	$(CC) -Og -o $(TARGET) $(LINKS) $(OBJS)
 

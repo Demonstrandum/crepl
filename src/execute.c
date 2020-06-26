@@ -119,7 +119,11 @@ finished_search:
 
 		// How to evaluate specific operators.
 		DataValue *lhs = execute(ctx, stmt->node.binary.left);
+		if (lhs == NULL)
+			return NULL;
 		DataValue *rhs = execute(ctx, stmt->node.binary.right);
+		if (rhs == NULL)
+			return NULL;
 
 		// Numerical binary operations.
 		if (strcmp(op, "+") == 0) {
