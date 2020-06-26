@@ -197,6 +197,9 @@ NumberNode *make_number(NumberType type, void *val)
 	return num;
 }
 
+// Parse number literals:
+// e.g. 3, 8.2, 2E32, 3E+4, 1.6E-19, 0b010110, 0xff32a1, 0o0774, etc.
+// TODO: Parse binary, hexadecimal and octal literals (0b, 0x, 0o).
 NumberNode *parse_number(const char *str)
 {
 	NumberNode *number = malloc(sizeof(NumberNode));
@@ -250,10 +253,7 @@ NumberNode *parse_number(const char *str)
 	}
 
 	number->type = FLOAT;
-	fsize power_term = 1;
-
-	fsize significand = strtold(str, NULL);
-	number->value.f = significand * power_term;
+	number->value.f = strtold(str, NULL);
 
 	return number;
 }

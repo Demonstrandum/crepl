@@ -27,8 +27,11 @@ sudo make install  # Installs the program system wide.
 ```
 
 ## TODO
+ - [ ] Imaginary numbers (using `complex.h`).
  - [ ] User defined functions.
+ - [ ] Extend factorial to positive reals and complex values using Gamma function.
  - [ ] Garbage collection.
+ - [ ] Numerical equation solver (polynomial, simultaneous, &c.).
  - [ ] Add more functionality, notably for calculus.
  - [ ] Symbol manipulation (?).
  - [ ] Extend numbers to include “Big Numbers” (“Big Integers” and “Big Decimals”/Rationals), numbers a currently limited to ~80bit floats and pointer-sized (likely 64bit) integeres.
