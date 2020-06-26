@@ -77,7 +77,8 @@ TokenType char_token_type(char c, char last_char, TokenType last_token_type)
 	// All possible operator/special-symbol characters:
 	if ((c >= '!' && c <= '/')
 	||  (c >= ':' && c <= '@')
-	||  (c >= '{' && c <= '~')) {
+	||  (c >= '{' && c <= '~')
+	||  (c >= '[' && c <= '`')) {
 		return TT_OPERATOR;
 	}
 
