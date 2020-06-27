@@ -94,7 +94,18 @@ DataValue *builtin_ ##NAME (DataValue input) \
 	return result; \
 }
 
-MATH_WRAPPER(sin, sinl)
+// This is cheaty, but hey oh.
+fsize nice_sin(fsize alpha)
+{
+	fsize multiples_of_pi = alpha / M_PI;
+	fsize integral = 0;
+	fsize fractional = modfl(multiples_of_pi, &integral);
+	if (fractional == 0.0f) // i.e. if alpha/pi is a whole number...
+		return 0.0f;
+	return sin(alpha);
+}
+
+MATH_WRAPPER(sin, nice_sin)
 MATH_WRAPPER(sinh, sinhl)
 MATH_WRAPPER(cos, cosl)
 MATH_WRAPPER(cosh, coshl)
@@ -149,8 +160,8 @@ DataValue *builtin_factorial(DataValue input)
 	if (num == NULL)
 		return NULL;
 
-	f32 integral = 0;
-	f32 fractional = modff(num->value.f, &integral);
+	fsize integral = 0;
+	fsize fractional = modfl(num->value.f, &integral);
 	if ((num->type == FLOAT && (fractional != 0 || num->value.f < 0))
 	||  (num->type == INT && num->value.i < 0)) {
 		ERROR_TYPE = EXECUTION_ERROR;
