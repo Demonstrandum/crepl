@@ -308,6 +308,12 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 
 		unary->callee = callee;
 		unary->operand = parse_expr(rest, precedence);
+		if (unary->operand == NULL) {
+			ERROR_TYPE = PARSE_ERROR;
+			sprintf(ERROR_MSG, "Missing right-hand-side of prefix"
+				" operator `%s'.", token->value);
+			return NULL;
+		}
 		unary->is_postfix = false;
 
 		node->type = UNARY_NODE;
