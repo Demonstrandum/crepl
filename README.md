@@ -6,8 +6,8 @@ with intuitive mathematical notation as syntax.
 
 ## Install
 
-You'll need `git` (if cloning), a C compiler (e.g. `gcc`)
-and `make` (`build-essential` / `base-devel`).
+You'll need `git` (if cloning), a C compiler (e.g. `gcc`),
+the GNU readline library, and `make` (`build-essential` / `base-devel`).
 
 ### Clone
 Clone / Download this repositroy however you like, e.g.

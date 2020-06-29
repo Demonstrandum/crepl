@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install-readline
+      run: apt-get install lib32readline8 lib32readline8-dev
     - name: make
       run: make
