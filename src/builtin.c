@@ -107,7 +107,7 @@ fsize nice_sin(fsize alpha)
 
 #define gamma_upper_bound 1000
 #define gamma_resolution 1000000
-#define gamma_h 0.001 //upper bound / resolution
+#define gamma_h gamma_upper_bound/gamma_resolution  //upper bound / resolution
 
 fsize gamma_integrad(float x, fsize num) {
 	return pow(x, num) * exp(-x);
