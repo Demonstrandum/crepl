@@ -105,6 +105,24 @@ fsize nice_sin(fsize alpha)
 	return sin(alpha);
 }
 
+#define gamma_upper_bound 1000
+#define gamma_resolution 1000000
+#define gamma_h gamma_upper_bound/gamma_resolution  //upper bound / resolution
+
+fsize gamma_integrad(float x, fsize num) {
+	return pow(x, num) * exp(-x);
+}
+
+fsize gammae(fsize num) {
+	fsize sum = 0;
+
+	for (int i = 1; i < gamma_resolution; i++) {
+    	sum += gamma_integrad(i*gamma_h, num);
+    }
+
+    return 0.5 * gamma_h * (gamma_integrad(0, num) + gamma_integrad(gamma_upper_bound, num) + 2 * sum);
+}
+
 MATH_WRAPPER(sin, nice_sin)
 MATH_WRAPPER(sinh, sinhl)
 MATH_WRAPPER(cos, cosl)
@@ -157,23 +175,28 @@ DataValue *builtin_neg(DataValue input)
 DataValue *builtin_factorial(DataValue input)
 {
 	NumberNode *num = type_check("!", LHS, T_NUMBER, &input);
-	if (num == NULL)
-		return NULL;
-
-	fsize integral = 0;
-	fsize fractional = modfl(num->value.f, &integral);
-	if ((num->type == FLOAT && (fractional != 0 || num->value.f < 0))
-	||  (num->type == INT && num->value.i < 0)) {
-		ERROR_TYPE = EXECUTION_ERROR;
-		strcpy(ERROR_MSG,
-			"factorial (`!') is only defined for positve integers.");
-	}
 
 	NumberNode tmp = num_to_float(*num);
 	NumberNode *new_num = malloc(sizeof(NumberNode));
 	memcpy(new_num, &tmp, sizeof(NumberNode));
 
 	DataValue *result = wrap_data(T_NUMBER, new_num);
+	if (num == NULL)
+		return NULL;
+
+	fsize integral = 0;
+	fsize fractional = modfl(num->value.f, &integral);
+	if ((num->type == FLOAT && (num->value.f < 0))
+	||  (num->type == INT && num->value.i < 0)) {
+		ERROR_TYPE = EXECUTION_ERROR;
+		strcpy(ERROR_MSG,
+			"factorial (`!') is only defined for positve real numbers.");
+	} else if ((num->type == FLOAT && (fractional != 0))) {
+		new_num->value.f = gammae(num->value.f);
+		result->value = new_num;
+		return result;
+		}
+
 	if (new_num->value.f == 0) {
 		new_num->value.f = 1;
 		result->value = new_num;
@@ -187,6 +210,7 @@ DataValue *builtin_factorial(DataValue input)
 	result->value = new_num;
 	return result;
 }
+
 
 #define BINARY_FUNCTION(NAME, OP) \
 NumberNode *num_ ## NAME (NumberNode lhs, NumberNode rhs) \

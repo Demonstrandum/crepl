@@ -11,6 +11,8 @@ NumberNode num_to_float(NumberNode);
 NumberNode num_to_int(NumberNode);
 NumberNode *upcast_pair(NumberNode, NumberNode);
 
+fsize gamma_func(float, fsize);
+fsize gammae(fsize);
 DataValue *builtin_sin(DataValue);
 DataValue *builtin_sinh(DataValue);
 DataValue *builtin_cos(DataValue);
