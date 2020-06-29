@@ -105,22 +105,34 @@ fsize nice_sin(fsize alpha)
 	return sin(alpha);
 }
 
-#define gamma_upper_bound 1000
-#define gamma_resolution 1000000
-#define gamma_h gamma_upper_bound/gamma_resolution  //upper bound / resolution
+fsize gamma_complete(fsize num) {
+	if (num == 0)
+		return INF;
 
-fsize gamma_integrad(float x, fsize num) {
-	return pow(x, num) * exp(-x);
-}
+	fsize integral = 0;
+	fsize fractional = modfl(num, &integral);
 
-fsize gammae(fsize num) {
-	fsize sum = 0;
+	if (fractional == 0) {
+		if (num < 0)
+			return INF;
+		fsize res = 1;
+		for (fsize i = num - 1; i > 1; --i)
+			res *= i;
+		return res;
+	}
 
-	for (int i = 1; i < gamma_resolution; i++) {
-    	sum += gamma_integrad(i*gamma_h, num);
-    }
+	if (num < 0) {
+		// Gamma(x) = (1/x) * Gamma(x + 1)
+		fsize acc = 1 / num;
+		fsize i = num + 1;
+		do {
+			acc *= 1 / i;
+			i += 1;
+		} while (i < 0);
 
-    return 0.5 * gamma_h * (gamma_integrad(0, num) + gamma_integrad(gamma_upper_bound, num) + 2 * sum);
+		return acc * tgammal(i);
+	}
+	return tgammal(num);
 }
 
 MATH_WRAPPER(sin, nice_sin)
@@ -145,6 +157,7 @@ MATH_WRAPPER(atanh, atanhl)
 // TODO: atan2, hypot
 MATH_WRAPPER(ceil, ceil)
 MATH_WRAPPER(floor, floor)
+MATH_WRAPPER(Gamma, gamma_complete)
 
 DataValue *builtin_neg(DataValue input)
 {
@@ -176,37 +189,15 @@ DataValue *builtin_factorial(DataValue input)
 {
 	NumberNode *num = type_check("!", LHS, T_NUMBER, &input);
 
-	NumberNode tmp = num_to_float(*num);
-	NumberNode *new_num = malloc(sizeof(NumberNode));
-	memcpy(new_num, &tmp, sizeof(NumberNode));
-
-	DataValue *result = wrap_data(T_NUMBER, new_num);
 	if (num == NULL)
 		return NULL;
 
-	fsize integral = 0;
-	fsize fractional = modfl(num->value.f, &integral);
-	if ((num->type == FLOAT && (num->value.f < 0))
-	||  (num->type == INT && num->value.i < 0)) {
-		ERROR_TYPE = EXECUTION_ERROR;
-		strcpy(ERROR_MSG,
-			"factorial (`!') is only defined for positve real numbers.");
-	} else if ((num->type == FLOAT && (fractional != 0))) {
-		new_num->value.f = gammae(num->value.f);
-		result->value = new_num;
-		return result;
-		}
+	NumberNode tmp = num_to_float(*num);
+	NumberNode *new_num = malloc(sizeof(NumberNode));
+	memcpy(new_num, &tmp, sizeof(NumberNode));
+	new_num->value.f = gamma_complete(new_num->value.f + 1);
 
-	if (new_num->value.f == 0) {
-		new_num->value.f = 1;
-		result->value = new_num;
-		return result;
-	}
-	ssize i = new_num->value.f - 1;
-	while (i > 1) {
-		new_num->value.f *= i;
-		--i;
-	}
+	DataValue *result = wrap_data(T_NUMBER, new_num);
 	result->value = new_num;
 	return result;
 }

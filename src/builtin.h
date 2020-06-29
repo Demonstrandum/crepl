@@ -36,6 +36,7 @@ DataValue *builtin_ceil(DataValue);
 DataValue *builtin_floor(DataValue);
 DataValue *builtin_factorial(DataValue);
 DataValue *builtin_neg(DataValue);
+DataValue *builtin_Gamma(DataValue);
 
 NumberNode *num_add(NumberNode, NumberNode);
 NumberNode *num_sub(NumberNode, NumberNode);
@@ -83,5 +84,6 @@ static const struct _func_name_pair builtin_fns[] = {
 	{ "!", { builtin_factorial } },
 	FUNC_PAIR(neg),
 	{ "-", { builtin_neg } },
+	FUNC_PAIR(Gamma),
 };
 

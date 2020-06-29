@@ -30,7 +30,6 @@ sudo make install  # Installs the program system wide.
  - [ ] Throw errors on overflows until we implement bignums.
  - [ ] Imaginary numbers (using `complex.h`).
  - [ ] User defined functions.
- - [ ] Extend factorial to positive reals and complex values using Gamma function.
  - [ ] Garbage collection.
  - [ ] Numerical equation solver (polynomial, simultaneous, &c.).
  - [ ] Add more functionality, notably for calculus.

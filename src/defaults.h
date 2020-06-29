@@ -7,10 +7,17 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "error.h"
 
 #define len(array) (sizeof(array) / sizeof((array)[0]))
+
+#ifdef INFINITY
+	#define INF INFINITY
+#else
+	#define INF (1.0 / 0.0)
+#endif
 
 typedef uint8_t u8 ;
 typedef uint16_t u16;
