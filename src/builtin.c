@@ -105,18 +105,22 @@ fsize nice_sin(fsize alpha)
 	return sin(alpha);
 }
 
-fsize gamma_func(float x, fsize num) {
+#define gamma_upper_bound 1000
+#define gamma_resolution 1000000
+#define gamma_h 0.001 //upper bound / resolution
+
+fsize gamma_integrad(float x, fsize num) {
 	return pow(x, num) * exp(-x);
 }
 
 fsize gammae(fsize num) {
 	fsize sum = 0;
 
-	for (int i = 1; i < 1000000; i++) {
-    	sum += gamma_func(i*0.001, num);
+	for (int i = 1; i < gamma_resolution; i++) {
+    	sum += gamma_integrad(i*gamma_h, num);
     }
 
-    return 0.5 * 0.001 * (gamma_func(0, num) + gamma_func(1000, num) + 2 * sum);
+    return 0.5 * gamma_h * (gamma_integrad(0, num) + gamma_integrad(gamma_upper_bound, num) + 2 * sum);
 }
 
 MATH_WRAPPER(sin, nice_sin)
