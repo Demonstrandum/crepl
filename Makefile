@@ -1,10 +1,11 @@
 CC := gcc
 OPT := -O3
 WARN := -Wall -Wpedantic -Wextra -Wshadow -fcompare-debug-second
-CFLAGS := $(WARN) $(OPT)
+LINKS := -lm -lreadline
+CFLAGS := $(WARN) $(OPT) $(LINKS)
 TARGET := crepl
 OBJS := main.o defaults.o error.o parse.o displays.o builtin.o execute.o prelude.o
-LINKS := -lm -lreadline
+
 
 ifeq ($(PREFIX),)
     PREFIX := /usr/local
