@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <wchar.h>
 
@@ -16,13 +18,61 @@
 
 static const char *PROMPT = "::> ";
 
+char *response = NULL;
+pthread_t thread_id = 0;
+
 void sigint_handle(int sig)
 {
 	printf("\b\b  ");  // Obsucre '^C' output.
-	printf("\nInterrupted (%d), [Ctrl-D] to stop inputting.\n", sig);
-    rl_on_new_line();
-	rl_replace_line("", 0);
-    rl_redisplay();
+	if (thread_id == 0) {
+		puts("\b\b\033[90m//----\033[0m");
+		printf("\033[1m");
+		printf("Signal (%d), [Ctrl-D] to stop inputting.\n", sig);
+		printf("\033[0m");
+		rl_on_new_line();
+		rl_replace_line("", 0);
+		rl_redisplay();
+	} else {
+		pthread_cancel(thread_id);
+		printf("\b\b\033[1mInterrputed expression evaluation");
+		printf(" (thread 0x%lX).\033[0m\n", thread_id);
+		thread_id = 0;
+	}
+
+}
+
+void *evaluation_thread(void *ctx_void)
+{
+	Context *ctx = ctx_void;
+
+	ParseNode *tree   = NULL;
+	DataValue *result = NULL;
+
+	tree = parse(response);
+
+	if (tree == NULL || ERROR_TYPE != NO_ERROR) {
+		handle_error();
+		return (void *)EXIT_FAILURE;
+	}
+
+	printf("\033[%luC\033[1A",
+		strlen(PROMPT)
+		+ strlen(response));
+	printf("\033[2m ≡ %s\033[0m\n", display_parsetree(tree));
+
+	result = execute(ctx, tree);
+
+	if (result == NULL || ERROR_TYPE != NO_ERROR) {
+		handle_error();
+		return (void *)EXIT_FAILURE;
+	}
+
+	if (result != NULL)
+		printf("#=> %s\n", display_datavalue(result));
+	if (tree != NULL)
+		free_parsenode(tree);
+
+	return (void *)EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv)
@@ -65,7 +115,6 @@ int main(int argc, char **argv)
 
 	Context *ctx = base_context();
 
-	char *response = NULL;
 	do {
 		char *line = readline(PROMPT);
 
@@ -77,29 +126,10 @@ int main(int argc, char **argv)
 			add_history(line);
 		response = line;
 
-		// Try to lex & parse the input.
-		ParseNode *tree = parse(response);
-
-		if (tree == NULL || ERROR_TYPE != NO_ERROR) {
-			handle_error();
-			continue;
-		}
-
-		printf("\033[%luC\033[1A",
-			strlen(PROMPT)
-			+ strlen(response));
-		printf("\033[2m ≡ %s\033[0m\n", display_parsetree(tree));
-
-		DataValue *result = execute(ctx, tree);
-
-		if (result == NULL || ERROR_TYPE != NO_ERROR) {
-			handle_error();
-			continue;
-		}
-
-		printf("#=> %s\n", display_datavalue(result));
-
-		free_parsenode(tree);
+		// Evaluation of input is done in thread.
+		pthread_create(&thread_id, NULL, evaluation_thread, ctx);
+		pthread_join(thread_id, NULL);
+		thread_id = 0;
 	} while (true);
 
 	write_history(cache_loc);

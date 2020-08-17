@@ -76,6 +76,19 @@ NumberNode *upcast_pair(NumberNode lhs, NumberNode rhs)
 	return pair;
 }
 
+DataValue *builtin_sleep(DataValue seconds)
+{
+	NumberNode *num = type_check("sleep", ARG, T_NUMBER, &seconds);
+	if (num == NULL) return NULL;
+
+	NumberNode *time = malloc(sizeof(NumberNode));
+	*time = num_to_int(*num);
+	if (time->value.i < 0) time->value.i = 0;
+
+	sleep((unsigned)time->value.i);
+	return wrap_data(T_NUMBER, time);
+}
+
 #define MATH_WRAPPER(NAME, FUNC)\
 DataValue *builtin_ ##NAME (DataValue input) \
 { \

@@ -1,7 +1,7 @@
 CC := gcc
 OPT := -O3
-WARN := -Wall -Wpedantic -Wextra -Wshadow -fcompare-debug-second
-LINKS := -lm -lreadline
+WARN := -Wall -Wpedantic -Wextra -Wshadow -Wno-psabi
+LINKS := -lm -lreadline -lpthread
 CFLAGS := $(WARN) $(OPT)
 TARGET := crepl
 OBJS := main.o defaults.o error.o parse.o displays.o builtin.o execute.o prelude.o

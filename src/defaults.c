@@ -15,7 +15,20 @@ ssize ipow(ssize base, usize exp)
     return result;
 }
 
-char *trim(char *str)
+char *remove_all_char(const char *str, char chr)
+{
+	char *new = strdup(str);
+	size_t str_len = strlen(str);
+	size_t new_len = 0;
+
+	for (size_t i = 0; i < str_len; ++i)
+		if (str[i] != chr) new[new_len++] = str[i];
+
+	new[new_len] = '\0';
+	return new;
+}
+
+char *trim(const char *str)
 {
 	char *p = strdup(str);
 	while (isspace(*p))
@@ -30,7 +43,7 @@ char *trim(char *str)
 }
 
 
-char *downcase(char *str)
+char *downcase(const char *str)
 {
 	char *p = strdup(str);
 	char *start = p;

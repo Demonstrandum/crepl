@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <unistd.h>
 
 #include "defaults.h"
 #include "parse.h"
@@ -13,6 +14,7 @@ NumberNode *upcast_pair(NumberNode, NumberNode);
 
 fsize gamma_func(float, fsize);
 fsize gammae(fsize);
+DataValue *builtin_sleep(DataValue);
 DataValue *builtin_sin(DataValue);
 DataValue *builtin_sinh(DataValue);
 DataValue *builtin_cos(DataValue);
@@ -52,6 +54,7 @@ struct _func_name_pair {
 };
 
 static const struct _func_name_pair builtin_fns[] = {
+	FUNC_PAIR(sleep),
 	FUNC_PAIR(sin),
 	FUNC_PAIR(sinh),
 	FUNC_PAIR(cos),

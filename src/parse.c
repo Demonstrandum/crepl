@@ -49,23 +49,22 @@ TokenType char_token_type(char c, char last_char, TokenType last_token_type)
 	if (c <= '9' && c >= '0') {
 		if (last_token_type == TT_IDENTIFIER)
 			return TT_IDENTIFIER;
-		else
-			return TT_NUMERIC;
+		return TT_NUMERIC;
 	}
 	if (c == '_'
-	&& (last_token_type	== TT_IDENTIFIER
+	&& (last_token_type == TT_IDENTIFIER
 	|| last_token_type == TT_NUMERIC))
 		return last_token_type;
 	if (c == '.'
 	&& (last_token_type == TT_OPERATOR
 	|| last_token_type == TT_NONE))
 		return TT_NUMERIC;
-	if ((c == '.' || c == 'E')  // Scientific notation.
+	if ((c == '.' || c == 'E' || c == 'P')  // Scientific notation.
 	&& last_token_type == TT_NUMERIC)
 		return TT_NUMERIC;
 	if ((c == '+' || c == '-') && last_char == 'E')
 		return TT_NUMERIC;
-	if ((c == 'x' || c == 'o') && last_char == '0')
+	if ((c == 'x' || c == 'X' || c == 'o' || c == 'O') && last_char == '0')
 		return TT_NUMERIC;
 	if (c == '(')
 		return TT_LPAREN;
@@ -75,12 +74,11 @@ TokenType char_token_type(char c, char last_char, TokenType last_token_type)
 		return TT_NONE;
 
 	// All possible operator/special-symbol characters:
-	if ((c >= '!' && c <= '/')
-	||  (c >= ':' && c <= '@')
-	||  (c >= '{' && c <= '~')
-	||  (c >= '[' && c <= '`')) {
-		return TT_OPERATOR;
-	}
+	if (((c >= '!' && c <= '/')
+	 || (c >= ':' && c <= '@')
+	 || (c >= '{' && c <= '~')
+	 || (c >= '[' && c <= '`'))
+	&& c != '_') return TT_OPERATOR;
 
 	// Anything else is treated as an identifier.
 	return TT_IDENTIFIER;
@@ -200,10 +198,13 @@ NumberNode *make_number(NumberType type, void *val)
 
 // Parse number literals:
 // e.g. 3, 8.2, 2E32, 3E+4, 1.6E-19, 0b010110, 0xff32a1, 0o0774, etc.
-// TODO: Parse binary, hexadecimal and octal literals (0b, 0x, 0o).
+// TODO: Parse binary, hexadecimal and octal literals (0b, 0x, 0o)
+//       as well as hex/binary `P' power notation..
 NumberNode *parse_number(const char *str)
 {
 	NumberNode *number = malloc(sizeof(NumberNode));
+
+	str = remove_all_char(str, '_');
 
 	char *exponent_ptr = strstr(str, "E");
 	char *neg_exponent_ptr = strstr(str, "E-");

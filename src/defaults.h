@@ -38,8 +38,9 @@ typedef long double fsize;
 
 ssize ipow(ssize, usize);
 
-char *trim(char *);
-char *downcase(char *);
+char *remove_all_char(const char *, char);
+char *trim(const char *);
+char *downcase(const char *);
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
