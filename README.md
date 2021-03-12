@@ -27,6 +27,7 @@ sudo make install  # Installs the program system wide.
 ```
 
 ## TODO
+ - [ ] A `ref(.)` function, for referencing/aliasing other variables.
  - [ ] Throw errors on overflows until we implement bignums.
  - [ ] Imaginary numbers (using `complex.h`).
  - [ ] User defined functions.

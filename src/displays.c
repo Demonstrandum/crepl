@@ -60,6 +60,15 @@ char *display_parsetree(const ParseNode *tree)
 	case NUMBER_NODE: {
 		return display_numbernode(tree->node.number);
 	}
+	case STRING_NODE: {  // TODO: Escape the string.
+		usize l = strlen(tree->node.str.value);
+		byte *str = malloc(l + 2);
+		str[0] = '"';
+		strcpy(str + 1, tree->node.str.value);
+		str[l + 1] = '"';
+		str[l + 2] = '\0';
+		return str;
+	}
 	case UNARY_NODE: {
 		UnaryNode unary = tree->node.unary;
 		char *operand_str = display_parsetree(unary.operand);
@@ -120,7 +129,7 @@ char *display_datavalue(const DataValue *data)
 	}
 	default:
 		string = malloc(sizeof(char) * 128); // Safe bet.
-		sprintf(string, "<%s at 0x%p>",
+		sprintf(string, "<%s at %p>",
 				display_datatype(data->type),
 				data->value);
 	}

@@ -3,6 +3,7 @@
 char *PRELUDE_STATEMENTS[] = {
 	"tau = 2pi",
 	"phi = 1.61803398875",
+	"crepl = \"Calculator REPL, v" VERSION ".\""
 };
 
 void execute_prelude(Context *ctx)
@@ -25,6 +26,6 @@ void execute_prelude(Context *ctx)
 fatality:
 	handle_error();
 	fprintf(stderr, "\nFATAL: Prelude failed to run without error.\n");
-	fprintf(stderr, "ABORTING\n!");
+	fprintf(stderr, "ABORTING!\n");
 	exit(1);
 }

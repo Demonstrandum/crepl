@@ -8,6 +8,7 @@ typedef enum {
 	TT_IDENTIFIER,
 	TT_NUMERIC,
 	TT_OPERATOR,
+	TT_STRING,
 	TT_NONE,
 } TokenType;
 
@@ -69,6 +70,7 @@ static const Operator KNOWN_OPERATORS[] = {
 typedef enum {
 	IDENT_NODE,
 	NUMBER_NODE,
+	STRING_NODE,
 	UNARY_NODE,
 	BINARY_NODE,
 } NodeType;
@@ -78,6 +80,11 @@ struct _parse_node;
 typedef struct {
 	char *value;
 } IdentNode;
+
+typedef struct {
+	usize len;
+	byte *value;
+} StringNode;
 
 typedef enum {
 	FLOAT,
@@ -111,6 +118,7 @@ typedef struct _parse_node {
 	NodeType type;
 	union {
 		IdentNode ident;
+		StringNode str;
 		NumberNode number;
 		UnaryNode unary;
 		BinaryNode binary;

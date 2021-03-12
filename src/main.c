@@ -15,6 +15,7 @@
 #include "parse.h"
 #include "execute.h"
 #include "displays.h"
+#include "gui.h"
 
 static const char *PROMPT = "::> ";
 
@@ -81,15 +82,38 @@ int main(int argc, char **argv)
 	printf("\033[1m");
 	printf("CREPL — Calculator Read Eval Print Loop");
 	printf("\033[0m");
-	puts(" (" COMPILER ") (" __DATE__ ")");
-	puts("Type \"exit\" or [Ctrl-D] (i.e. EOF) to quit.");
+	puts(" (v" VERSION ") (" COMPILER ") (" __DATE__ ")");
 
 	bool verbose = false;
+	bool gui_mode = false;
 	// Parse command line arguments.
 	for (int i = 0; i < argc; ++i) {
-		if (strcmp(argv[i], "-v") == 0)
+		if (strcmp(argv[i], "-v") == 0
+		||  strcmp(argv[i], "--verbose") == 0)
 			verbose = true;
+		else if (strcmp(argv[i], "-V") == 0
+		||       strcmp(argv[i], "--version") == 0)
+			{ puts("Version " VERSION "."); return EXIT_SUCCESS; }
+		else if (strcmp(argv[i], "-g") == 0
+		||       strcmp(argv[i], "--gui") == 0)
+			gui_mode = true;
 	}
+
+#ifndef GUI
+	if (gui_mode) {
+		puts("This CREPL executable was not compiled with GUI support.");
+		return EXIT_FAILURE;
+	}
+#else
+	if (gui_mode) {
+		int success = start_gui();
+		if (success == 0)
+			return EXIT_SUCCESS;
+		return EXIT_FAILURE;
+	}
+#endif
+
+	puts("Type \"exit\" or [Ctrl-D] (i.e. EOF) to quit.");
 
 	// Configure readline.
 	rl_clear_signals();

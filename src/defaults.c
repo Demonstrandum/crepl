@@ -15,9 +15,9 @@ ssize ipow(ssize base, usize exp)
     return result;
 }
 
-char *remove_all_char(const char *str, char chr)
+byte *remove_all_bytes(const byte *str, byte chr)
 {
-	char *new = strdup(str);
+	byte *new = strdup(str);
 	size_t str_len = strlen(str);
 	size_t new_len = 0;
 
@@ -28,13 +28,13 @@ char *remove_all_char(const char *str, char chr)
 	return new;
 }
 
-char *trim(const char *str)
+byte *trim(const byte *str)
 {
-	char *p = strdup(str);
+	byte *p = strdup(str);
 	while (isspace(*p))
         ++p;
 
-	char *end = p + strlen(p) - 1;
+	byte *end = p + strlen(p) - 1;
     while (end > p && isspace(*end))
         --end;
 
@@ -43,10 +43,10 @@ char *trim(const char *str)
 }
 
 
-char *downcase(const char *str)
+byte *downcase(const byte *str)
 {
-	char *p = strdup(str);
-	char *start = p;
+	byte *p = strdup(str);
+	byte *start = p;
 	for (; *p; ++p) *p = tolower(*p);
 	return start;
 }

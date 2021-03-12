@@ -8,6 +8,7 @@
 #include <math.h>
 
 static const f32 LOCALS_REALLOC_GROWTH_FACTOR = 1.5;
+static const fsize ZERO = 0.0;
 
 #define NUMERICAL_BINARY_OPERATION(OPERATION) do { \
 	NumberNode *l_num = type_check(op, LHS, T_NUMBER, lhs); \
@@ -24,10 +25,27 @@ void free_datavalue(DataValue *data)
 	free(data);
 }
 
+static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt);
+
 /// Takes in an execution context (ctx) and a
 /// statement as produced by the parser (stmt).
 /// Returns what it evaluates to.
 DataValue *execute(Context *ctx, const ParseNode *stmt)
+{
+	// Recurse dowm parse tree, execute each node, bottom up.
+	DataValue *data = recursive_execute(ctx, stmt);
+
+	// When line/statement is finished evaluating, bind `Ans'.
+	if (data != NULL && ERROR_TYPE == NO_ERROR) {
+		bind_local(ctx, "Ans", data->type, data->value);
+		bind_local(ctx, "ans", data->type, data->value);
+		bind_local(ctx,   "_", data->type, data->value);
+	}
+
+	return data;
+}
+
+static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 {
 	DataValue *data = malloc(sizeof(DataValue));
 	switch (stmt->type) {
@@ -66,9 +84,15 @@ finished_search:
 		memcpy(data->value, &stmt->node.number, sizeof(NumberNode));
 		break;
 	}
+	case STRING_NODE: {
+		data->type = T_STRING;
+		data->value = malloc(stmt->node.str.len + 1);
+		memcpy(data->value, stmt->node.str.value, stmt->node.str.len + 1);
+		break;
+	}
 	case UNARY_NODE: { // Functions, essentially.
-		DataValue *callee  = execute(ctx, stmt->node.unary.callee);
-		DataValue *operand = execute(ctx, stmt->node.unary.operand);
+		DataValue *callee  = recursive_execute(ctx, stmt->node.unary.callee);
+		DataValue *operand = recursive_execute(ctx, stmt->node.unary.operand);
 
 		if (callee == NULL || operand == NULL)
 			return NULL;
@@ -112,16 +136,16 @@ finished_search:
 			}
 			char *lvalue = stmt->node.binary.left->node.ident.value;
 			free(data);
-			data = execute(ctx, stmt->node.binary.right);
+			data = recursive_execute(ctx, stmt->node.binary.right);
 			bind_local(ctx, lvalue, data->type, data->value);
 			break;
 		}
 
 		// How to evaluate specific operators.
-		DataValue *lhs = execute(ctx, stmt->node.binary.left);
+		DataValue *lhs = recursive_execute(ctx, stmt->node.binary.left);
 		if (lhs == NULL)
 			return NULL;
-		DataValue *rhs = execute(ctx, stmt->node.binary.right);
+		DataValue *rhs = recursive_execute(ctx, stmt->node.binary.right);
 		if (rhs == NULL)
 			return NULL;
 
@@ -151,6 +175,7 @@ finished_search:
 		return NULL;
 	}
 	}
+
 	return data;
 }
 
@@ -263,7 +288,10 @@ Context *init_context()
 	// name of the function/scope.
 	Local *scope_name = make_local(
 		"__this_scope", T_STRING, (void *)ctx->function);
+	Local *ans = make_local(
+		"Ans", T_NUMBER, (void *)make_number(FLOAT, (fsize *)&ZERO));
 	ctx->locals[0] = *scope_name;
+	ctx->locals[0] = *ans;
 	// ^ Sets the first variable, default in every scope
 	// (good for debuggin purposes).
 

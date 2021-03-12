@@ -19,6 +19,9 @@ void free_parsenode(ParseNode *node)
 	case IDENT_NODE:
 		free((char *)node->node.ident.value);
 		break;
+	case STRING_NODE:
+		free((char *)node->node.str.value);
+		break;
 	case NUMBER_NODE:
 		break;
 	case UNARY_NODE:
@@ -72,6 +75,8 @@ TokenType char_token_type(char c, char last_char, TokenType last_token_type)
 		return TT_RPAREN;
 	if (c == '\0' || c == ' ' || c == '\t' || c == '\n' || c == '\r')
 		return TT_NONE;
+	if (c == '"')
+		return TT_STRING;
 
 	// All possible operator/special-symbol characters:
 	if (((c >= '!' && c <= '/')
@@ -138,6 +143,14 @@ Token *lex(char **source)
 	// Do not coalesce parentheses.
 	if (tt == TT_RPAREN || tt == TT_LPAREN) {
 		span++;
+	} else if (tt == TT_STRING) {  // String literals are not like others.
+		++span;  // Skip opening quote.
+		while ((*source)[span] != '"') {
+			if ((*source)[span] == '\\' && (*source)[span + 1] == '"')
+				++span;  // Don't stop at escaped quote.
+			++span;
+		}
+		++span;  // Skip ending quote.
 	} else {
 		while (tt == previous_tt) {
 			span++;
@@ -154,6 +167,8 @@ Token *lex(char **source)
 
 	*source += span;
 	Token *token = new_token(tt, sub_str);
+
+	free(sub_str);
 	return token;
 }
 
@@ -204,7 +219,7 @@ NumberNode *parse_number(const char *str)
 {
 	NumberNode *number = malloc(sizeof(NumberNode));
 
-	str = remove_all_char(str, '_');
+	str = remove_all_bytes(str, '_');
 
 	char *exponent_ptr = strstr(str, "E");
 	char *neg_exponent_ptr = strstr(str, "E-");
@@ -282,6 +297,13 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		node_into_ident(token->value, node);
 		break;
 	}
+	case TT_STRING: {
+		node->type = STRING_NODE;  // TODO: Parse string escapes etc.
+		node->node.str.value = strdup(token->value + 1);
+		node->node.str.len = strlen(token->value) - 2;
+		node->node.str.value[node->node.str.len] = '\0';
+		break;
+	}
 	case TT_OPERATOR: {
 		// Verify this is a prefix operator.
 		bool is_prefix = false;
@@ -329,7 +351,6 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 			ERROR_TYPE = PARSE_ERROR;
 			sprintf(ERROR_MSG, "Unclosed paranthetical expression.\n"
 				"  Missing `)' closing parenthesis.");
-			free_token((Token *)token);
 			return NULL;
 		}
 		free_token((Token *)token);
@@ -490,10 +511,9 @@ ParseNode *parse_expr(char **slice, u16 precedence)
 			strcpy(ERROR_MSG, "Could not finish parsing expression.");
 			break;
 		}
-		if (current_precedence != FUNCTION_PRECEDENCE)
-			token = lex(slice);
-		else
-			token = peek(slice);
+		token = current_precedence == FUNCTION_PRECEDENCE
+			? peek(slice)
+			:  lex(slice);
 
 		if (token == NULL)
 			break;

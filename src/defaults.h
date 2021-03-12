@@ -7,11 +7,16 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include <math.h>
 
 #include "error.h"
 
+#define VERSION "0.1.0"
+
 #define len(array) (sizeof(array) / sizeof((array)[0]))
+
+#define UNUSED(var) (void)(var)
 
 #ifdef INFINITY
 	#define INF INFINITY
@@ -19,12 +24,12 @@
 	#define INF (1.0 / 0.0)
 #endif
 
-typedef uint8_t u8 ;
+typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-typedef int8_t s8 ;
+typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
@@ -32,15 +37,25 @@ typedef int64_t s64;
 typedef size_t usize;
 typedef ptrdiff_t ssize;
 
+#if (CHAR_BIT == 8)
+	#if (CHAR_MIN < 0)
+		typedef unsigned char byte;
+	#else
+		typedef char byte;
+	#endif
+#else
+	typedef u8 byte;
+#endif
+
 typedef float f32;
 typedef double f64;
 typedef long double fsize;
 
 ssize ipow(ssize, usize);
 
-char *remove_all_char(const char *, char);
-char *trim(const char *);
-char *downcase(const char *);
+byte *remove_all_bytes(const byte *, byte);
+byte *trim(const byte *);
+byte *downcase(const byte *);
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
