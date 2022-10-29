@@ -2,7 +2,7 @@
 
 char *PRELUDE_STATEMENTS[] = {
 	"tau = 2pi",
-	"phi = 1.61803398875",
+	"phi = (1 + sqrt 5) / 2",
 	"crepl = \"Calculator REPL, v" VERSION ".\""
 };
 
