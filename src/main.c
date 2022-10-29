@@ -36,7 +36,7 @@ void sigint_handle(int sig)
 	} else {
 		pthread_cancel(thread_id);
 		printf("\b\b\033[1mInterrputed expression evaluation");
-		printf(" (thread 0x%lX).\033[0m\n", thread_id);
+		printf(" (thread 0x%lX).\033[0m\n", (unsigned long)thread_id);
 		thread_id = 0;
 	}
 

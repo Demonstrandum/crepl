@@ -10,6 +10,8 @@
 static const f32 LOCALS_REALLOC_GROWTH_FACTOR = 1.5;
 static const fsize ZERO = 0.0;
 
+static const DataValue nil = { .type = T_NIL, .value = NULL };
+
 #define NUMERICAL_BINARY_OPERATION(OPERATION) do { \
 	NumberNode *l_num = type_check(op, LHS, T_NUMBER, lhs); \
 	NumberNode *r_num = type_check(op, RHS, T_NUMBER, rhs); \
@@ -37,9 +39,9 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 
 	// When line/statement is finished evaluating, bind `Ans'.
 	if (data != NULL && ERROR_TYPE == NO_ERROR) {
-		bind_local(ctx, "Ans", data->type, data->value);
-		bind_local(ctx, "ans", data->type, data->value);
-		bind_local(ctx,   "_", data->type, data->value);
+		bind_data(ctx, "Ans", data);
+		bind_data(ctx, "ans", data);
+		bind_data(ctx,   "_", data);
 	}
 
 	return data;
@@ -105,14 +107,27 @@ finished_search:
 			break;
 		}
 
-		// Otheriwse, we expect a function pointer as callee.
-		FnPtr *func = type_check("function", ARG, T_FUNCTION_PTR, callee);
+		// Otheriwse, we expect a lambda or function pointer as callee.
+		void *func = type_check("function", ARG, T_LAMBDA | T_FUNCTION_PTR, callee);
 		if (func == NULL)
 			return NULL;
 
-		FUNC_PTR(fn) = func->fn;
-		free(data);
-		data = fn(*operand);
+		if (callee->type == T_FUNCTION_PTR) {
+			FUNC_PTR(fn) = ((FnPtr *)func)->fn;
+			free(data);
+			data = fn(*operand);
+		} else if (callee->type == T_LAMBDA) {
+			Lambda *lambda = func;
+			// Make the function call frame / local execution context.
+			Context *local_ctx = make_context(lambda->name, ctx);
+			// Bind the arguments to the local context.
+			// TODO: Make this a loop over the tuple if a tuple were provided.
+			bind_data(local_ctx, lambda->args, operand);
+			data = recursive_execute(local_ctx, lambda->body);
+		} else {
+			fprintf(stderr, "prelimary type check failed to catch out alternative\n");
+			exit(2);
+		}
 
 		break;
 	}
@@ -127,18 +142,42 @@ finished_search:
 		char *op = ident.value;
 		// Equality is special:
 		if (strcmp(op, "=") == 0) {
-			// TODO: Add support for assignment of functions?
-			if (stmt->node.binary.left->type != IDENT_NODE) {
+			if (stmt->node.binary.left->type == IDENT_NODE) {
+				char *lvalue = stmt->node.binary.left->node.ident.value;
+				free(data);
+				data = recursive_execute(ctx, stmt->node.binary.right);
+				bind_local(ctx, lvalue, data->type, data->value);
+				break;
+			} else if (stmt->node.binary.left->type == UNARY_NODE) {
+				UnaryNode func = stmt->node.binary.left->node.unary;
+				ParseNode *body = clone_node(stmt->node.binary.right);
+				if (func.callee->type != IDENT_NODE) {
+					ERROR_TYPE = PARSE_ERROR;
+					strcpy(ERROR_MSG, "Function assignment must have"
+						" identifier as function name.");
+					return NULL;
+				}
+				// TODO: support tuples.
+				if (func.operand->type != IDENT_NODE) {
+					ERROR_TYPE = PARSE_ERROR;
+					strcpy(ERROR_MSG, "Function argument must be"
+						" single identifier or tuple of arguments.");
+					return NULL;
+				}
+				char *func_name = func.callee->node.ident.value;
+				// TODO: handel NUL-delimted arg_names from tuple argument.
+				char *arg_names = strdup(func.operand->node.ident.value);
+				Lambda *lambda = make_lambda(func_name, 1, arg_names, body);
+				bind_local(ctx, func_name, T_LAMBDA, lambda);
+				data->type = T_LAMBDA;
+				data->value = lambda;
+				break;
+			} else {
 				ERROR_TYPE = PARSE_ERROR;
 				strcpy(ERROR_MSG, "Left of assignment (`=') operator\n"
-					"  must be an identifier/variable.");
+					"  must be an identifier or function application.");
 				return NULL;
 			}
-			char *lvalue = stmt->node.binary.left->node.ident.value;
-			free(data);
-			data = recursive_execute(ctx, stmt->node.binary.right);
-			bind_local(ctx, lvalue, data->type, data->value);
-			break;
 		}
 
 		// How to evaluate specific operators.
@@ -179,6 +218,16 @@ finished_search:
 	return data;
 }
 
+Lambda *make_lambda(const char *name, usize arg_count, const char *args, ParseNode *body)
+{
+	Lambda *lambda = malloc(sizeof(Lambda));
+	lambda->name = strdup(name);
+	lambda->arg_count = arg_count;
+	lambda->args = (char *)args;
+	lambda->body = body;
+	return lambda;
+}
+
 DataValue *wrap_data(DataType type, void *value)
 {
 	DataValue *data = malloc(sizeof(DataValue));
@@ -192,7 +241,7 @@ void *type_check(const char *function_name, ParamPos pos,
 {
 	if (value != NULL
 	&& value->value != NULL
-	&& value->type == type)
+	&& (value->type & type) != 0)
 		return (void *)value->value;
 
 	ERROR_TYPE = TYPE_ERROR;
@@ -214,6 +263,13 @@ Local *make_local(const char *name, DataType type, void *value)
 	local->value.type = type;
 	local->value.value = value;
 	return local;
+}
+
+
+// Same as `bind_local`, but takes a pre-wrapped `DataValue`.
+void bind_data(Context *ctx, const char *name, DataValue *data)
+{
+	bind_local(ctx, name, data->type, data->value);
 }
 
 // Locals is a dynamically growable array.
@@ -245,8 +301,7 @@ void bind_local(Context *ctx, const char *name,
 		return;
 	}
 
-	ctx->locals[ctx->locals_count] = *local;
-	++ctx->locals_count;
+	ctx->locals[ctx->locals_count++] = *local;
 }
 
 void bind_builtin_functions(Context *ctx)
@@ -265,17 +320,18 @@ void bind_default_globals(Context *ctx)
 	fsize inf = HUGE_VAL;
 	fsize nan = NAN;
 
+	bind_local(ctx, "nil", T_NIL, NULL);
 	bind_local(ctx, "pi", T_NUMBER, make_number(FLOAT, &pi));
 	bind_local(ctx, "e", T_NUMBER, make_number(FLOAT, &e));
 	bind_local(ctx, "inf", T_NUMBER, make_number(FLOAT, &inf));
 	bind_local(ctx, "nan", T_NUMBER, make_number(FLOAT, &nan));
 }
 
-Context *init_context()
+Context *make_context(const char *scope_name, Context *super_scope)
 {
 	Context *ctx = malloc(sizeof(Context));
-	ctx->superior = NULL; // There is no context superior to this one.
-	ctx->function = "<main>"; // Main function/scope.
+	ctx->superior = super_scope;
+	ctx->function = scope_name;
 
 	// Initialise with 6 free spaces for local variables.
 	// This may have to be reallocated if more than 6
@@ -286,12 +342,12 @@ Context *init_context()
 
 	// Create an initial local varaible with the value of the
 	// name of the function/scope.
-	Local *scope_name = make_local(
-		"__this_scope", T_STRING, (void *)ctx->function);
-	Local *ans = make_local(
-		"Ans", T_NUMBER, (void *)make_number(FLOAT, (fsize *)&ZERO));
-	ctx->locals[0] = *scope_name;
-	ctx->locals[0] = *ans;
+	Local *this_scope = make_local("__this_scope",
+		T_STRING, (void *)ctx->function);
+	Local *ans = make_local("Ans",
+		T_NUMBER, (void *)make_number(FLOAT, (fsize *)&ZERO));
+	ctx->locals[0] = *this_scope;
+	ctx->locals[1] = *ans;
 	// ^ Sets the first variable, default in every scope
 	// (good for debuggin purposes).
 
@@ -308,10 +364,8 @@ Context *base_context()
 	return ctx;
 }
 
-Context *make_context(const char *scope_name, Context *super_scope)
+// Create main parent context.
+Context *init_context()
 {
-	Context *ctx = init_context();
-	ctx->function = scope_name;
-	ctx->superior = super_scope;
-	return ctx;
+	return make_context("<main>", NULL);
 }

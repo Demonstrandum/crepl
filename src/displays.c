@@ -7,6 +7,28 @@
 #include "execute.h"
 #include "displays.h"
 
+char *display_nil(void)
+{
+	return "nil";
+}
+
+char *display_lambda(Lambda *lambda)
+{
+	char *str = calloc(128, sizeof(char));
+	char *ptr = str;
+	ptr += sprintf(ptr, "<lambda %s of (", lambda->name);
+	char *arg_name = lambda->args;
+	for (usize i = 0; i < lambda->arg_count; ++i) {
+		usize offs = sprintf(ptr, "%s", arg_name);
+		arg_name += offs + 1;
+		ptr += offs;
+		ptr += sprintf(ptr, ", ");
+	}
+	ptr -= 2;  // remove trailing comma and space.
+	ptr += sprintf(ptr, ") at %p>", (void *)lambda);
+	return str;
+}
+
 char *display_numbernode(NumberNode num)
 {
 	char *str = malloc(sizeof(char) * 128); // Hope that's enough.
@@ -38,8 +60,14 @@ char *display_parampos(ParamPos pos)
 char *display_datatype(DataType type)
 {
 	switch (type) {
+	case T_NIL:
+		return "nil";
 	case T_NUMBER:
 		return "number";
+	case T_LAMBDA:
+		return "lambda";
+	case T_TUPLE:
+		return "tuple";
 	case T_FUNCTION_PTR:
 		return "function";
 	case T_STRING:
@@ -111,6 +139,9 @@ char *display_datavalue(const DataValue *data)
 		return "internal-null-pointer";
 
 	switch (data->type) {
+	case T_NIL: {
+		return display_nil();
+	}
 	case T_NUMBER: {
 		if (data->value == NULL)
 			return "number-with-null-value";
@@ -126,6 +157,9 @@ char *display_datavalue(const DataValue *data)
 		string[len + 1] = '"';
 		string[len + 2] = '\0';
 		break;
+	}
+	case T_LAMBDA: {
+		return display_lambda(data->value);
 	}
 	default:
 		string = malloc(sizeof(char) * 128); // Safe bet.

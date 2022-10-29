@@ -1,6 +1,6 @@
 CC ?= gcc
 OPT := -O3
-WARN := -Wall -Wpedantic -Wextra -Wshadow -Wno-psabi
+WARN := -Wall -Wpedantic -Wextra -Wshadow -Wno-psabi -Wno-unused-command-line-argument
 LINKS := -lm -lpthread $(shell pkg-config --libs readline)
 INCLUDES := $(shell pkg-config --cflags readline)
 CFLAGS = $(WARN) $(OPT) $(INCLUDES) -funsigned-char
