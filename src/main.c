@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 {
 	// Welcome messsage.
 	printf("\033[1m");
-	printf("CREPL — Calculator Read Eval Print Loop");
+	printf("CREPL * Calculator Read Eval Print Loop");
 	printf("\033[0m");
 	puts(" (v" VERSION ") (" COMPILER ") (" __DATE__ ")");
 
