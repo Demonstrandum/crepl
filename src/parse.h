@@ -129,6 +129,7 @@ typedef struct _parse_node {
 
 void free_token(Token *);
 void free_parsenode(ParseNode *);
+ParseNode *clone_node(const ParseNode *);
 
 Token *lex(char **);
 Token *peek(char **);

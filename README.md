@@ -27,10 +27,15 @@ sudo make install  # Installs the program system wide.
 ```
 
 ## TODO
+ - [ ] Temporary variables with `let ... in ...` and `... where ...` expressions.
+ - [ ] Computed physical units with through postfix operators.
+   - [ ] User defined units.
  - [ ] A `ref(.)` function, for referencing/aliasing other variables.
  - [ ] Throw errors on overflows until we implement bignums.
  - [ ] Imaginary numbers (using `complex.h`).
- - [ ] User defined functions.
+ - [-] User defined functions.
+   - [x] Single argument.
+   - [ ] Tuple argument.
  - [ ] Garbage collection.
  - [ ] Numerical equation solver (polynomial, simultaneous, &c.).
  - [ ] Add more functionality, notably for calculus.

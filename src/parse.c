@@ -33,8 +33,40 @@ void free_parsenode(ParseNode *node)
 		free_parsenode((ParseNode *)node->node.binary.left);
 		free_parsenode((ParseNode *)node->node.binary.right);
 		break;
+	default:
+		fprintf(stderr, "unhandled node: %d\n", node->type);
+		exit(2);
 	}
 	free(node);
+}
+
+ParseNode *clone_node(const ParseNode *node)
+{
+	ParseNode *new = malloc(sizeof(ParseNode));
+	*new = *node;
+	switch (node->type) {
+	case IDENT_NODE:
+		new->node.ident.value = strdup(node->node.ident.value);
+		break;
+	case STRING_NODE:
+		new->node.str.value = strdup(node->node.str.value);
+		break;
+	case NUMBER_NODE:
+		break;
+	case UNARY_NODE:
+		new->node.unary.callee = clone_node(node->node.unary.callee);
+		new->node.unary.operand = clone_node(node->node.unary.operand);
+		break;
+	case BINARY_NODE:
+		new->node.binary.callee = clone_node(node->node.binary.callee);
+		new->node.binary.left = clone_node(node->node.binary.left);
+		new->node.binary.right = clone_node(node->node.binary.right);
+		break;
+	default:
+		fprintf(stderr, "unhandled node: %d\n", node->type);
+		exit(2);
+	}
+	return new;
 }
 
 /* --- Functions related to tokenising/lexing --- */
