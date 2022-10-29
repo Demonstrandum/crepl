@@ -1,8 +1,9 @@
-CC := gcc
+CC ?= gcc
 OPT := -O3
 WARN := -Wall -Wpedantic -Wextra -Wshadow -Wno-psabi
-LINKS := -lm -lreadline -lpthread
-CFLAGS = $(WARN) $(OPT) -funsigned-char
+LINKS := -lm -lpthread $(shell pkg-config --libs readline)
+INCLUDES := $(shell pkg-config --cflags readline)
+CFLAGS = $(WARN) $(OPT) $(INCLUDES) -funsigned-char
 TARGET := crepl
 CDIR := ./src
 OBJS := $(patsubst $(CDIR)/%.c,%.o,$(wildcard $(CDIR)/*.c))
