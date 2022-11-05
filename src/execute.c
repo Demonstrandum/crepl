@@ -21,10 +21,61 @@ static const DataValue nil = { .type = T_NIL, .value = NULL };
 	data->value = num_ ##OPERATION (*l_num, *r_num); \
 } while (0);
 
+inline
 void free_datavalue(DataValue *data)
 {
 	free(data->value);
 	free(data);
+}
+
+static
+void free_local(Local local)
+{
+	free(local.value.value);
+}
+
+static
+void unlink_local(Local *local)
+{
+	if (--local->value.refcount == 0) free_local(*local);
+}
+
+DataValue *link_datavalue(DataValue *data)
+{
+	++data->refcount;
+	return data;
+}
+
+void unlink_datavalue(DataValue *data)
+{
+	if (--data->refcount == 0) free_datavalue(data);
+}
+
+void free_context(Context *ctx)
+{
+	// If this context is getting free'd,
+	// the superior context has one fewer references.
+	if (ctx->superior != NULL)
+		unlink_context(ctx->superior);
+	// Unlink all references to locals.
+	for (usize i = 0; i < ctx->locals_count; ++i)
+		unlink_local(&ctx->locals[i]);
+	free(ctx->locals);
+	free(ctx);
+}
+
+inline
+Context *link_context(Context *ctx)
+{
+	++ctx->refcount;
+	return ctx;
+}
+
+/// Attempt to free context when no longer needed.
+/// i.e. decrements reference count.
+void unlink_context(Context *ctx)
+{
+	if (--ctx->refcount == 0) free_context(ctx);
 }
 
 static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt);
@@ -50,6 +101,7 @@ DataValue *execute(Context *ctx, const ParseNode *stmt)
 static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 {
 	DataValue *data = malloc(sizeof(DataValue));
+	data->refcount = 1;
 	switch (stmt->type) {
 	case IDENT_NODE: {
 		// Resolve variables by searching through local
@@ -119,13 +171,15 @@ finished_search:
 		} else if (callee->type == T_LAMBDA) {
 			Lambda *lambda = func;
 			// Make the function call frame / local execution context.
-			Context *local_ctx = make_context(lambda->name, ctx);
+			Context *local_ctx = make_context(lambda->name, lambda->scope);
 			// Bind the arguments to the local context.
 			// TODO: Make this a loop over the tuple if a tuple were provided.
 			bind_data(local_ctx, lambda->args, operand);
 			data = recursive_execute(local_ctx, lambda->body);
+			// Temporary execution context spent.
+			unlink_context(local_ctx);
 		} else {
-			fprintf(stderr, "prelimary type check failed to catch out alternative\n");
+			fprintf(stderr, "prelimary type check failed to catch wrong function callee.\n");
 			exit(2);
 		}
 
@@ -139,6 +193,11 @@ finished_search:
 			return NULL;
 		}
 
+		// Variables in case of function definition.
+		char *func_name = NULL;
+		const ParseNode *func_operand = NULL;
+		const ParseNode *func_body = NULL;
+
 		char *op = ident.value;
 		// Equality is special:
 		if (strcmp(op, "=") == 0) {
@@ -150,34 +209,45 @@ finished_search:
 				break;
 			} else if (stmt->node.binary.left->type == UNARY_NODE) {
 				UnaryNode func = stmt->node.binary.left->node.unary;
-				ParseNode *body = clone_node(stmt->node.binary.right);
+				func_body = stmt->node.binary.right;
 				if (func.callee->type != IDENT_NODE) {
 					ERROR_TYPE = PARSE_ERROR;
 					strcpy(ERROR_MSG, "Function assignment must have"
 						" identifier as function name.");
 					return NULL;
 				}
-				// TODO: support tuples.
-				if (func.operand->type != IDENT_NODE) {
-					ERROR_TYPE = PARSE_ERROR;
-					strcpy(ERROR_MSG, "Function argument must be"
-						" single identifier or tuple of arguments.");
-					return NULL;
-				}
-				char *func_name = func.callee->node.ident.value;
-				// TODO: handel NUL-delimted arg_names from tuple argument.
-				char *arg_names = strdup(func.operand->node.ident.value);
-				Lambda *lambda = make_lambda(func_name, 1, arg_names, body);
-				bind_local(ctx, func_name, T_LAMBDA, lambda);
-				data->type = T_LAMBDA;
-				data->value = lambda;
-				break;
+				func_name = func.callee->node.ident.value;
+				func_operand = func.operand;
 			} else {
 				ERROR_TYPE = PARSE_ERROR;
 				strcpy(ERROR_MSG, "Left of assignment (`=') operator\n"
 					"  must be an identifier or function application.");
 				return NULL;
 			}
+		} else if (strcmp(op, "->") == 0) {  // Lambda expression.
+			func_name = "<anon>";
+			func_operand = stmt->node.binary.left;
+			func_body = stmt->node.binary.right;
+		}
+
+		// Defines and binds a function.
+		if (func_body != NULL) {
+			// TODO: support tuples.
+			char *arg_names = strdup(func_operand->node.ident.value);
+			if (func_operand->type != IDENT_NODE) {
+				ERROR_TYPE = PARSE_ERROR;
+				strcpy(ERROR_MSG, "Function argument must be"
+					" single identifier or tuple of arguments.");
+				return NULL;
+			}
+			// TODO: handel NUL-delimted arg_names from tuple argument.
+			const ParseNode *body = clone_node(func_body);
+			Lambda *lambda = make_lambda(func_name, 1, arg_names, ctx, body);
+			if (func_name[0] != '<')
+				bind_local(ctx, func_name, T_LAMBDA, lambda);
+			data->type = T_LAMBDA;
+			data->value = lambda;
+			break;
 		}
 
 		// How to evaluate specific operators.
@@ -208,6 +278,7 @@ finished_search:
 		break;
 	}
 	default: {
+		fprintf(stderr, "unknown node type / unexpected node: %s\n", display_parsetree(stmt));
 		ERROR_TYPE = EXECUTION_ERROR;
 		strcpy(ERROR_MSG,
 			"Could not execute statement for unknown reason.");
@@ -218,19 +289,21 @@ finished_search:
 	return data;
 }
 
-Lambda *make_lambda(const char *name, usize arg_count, const char *args, ParseNode *body)
+Lambda *make_lambda(const char *name, usize arg_count, const char *args, Context *ctx, const ParseNode *body)
 {
 	Lambda *lambda = malloc(sizeof(Lambda));
 	lambda->name = strdup(name);
 	lambda->arg_count = arg_count;
 	lambda->args = (char *)args;
 	lambda->body = body;
+	lambda->scope = link_context(ctx);
 	return lambda;
 }
 
 DataValue *wrap_data(DataType type, void *value)
 {
 	DataValue *data = malloc(sizeof(DataValue));
+	data->refcount = 1;
 	data->type = type;
 	data->value = value;
 	return data;
@@ -260,6 +333,7 @@ Local *make_local(const char *name, DataType type, void *value)
 {
 	Local *local = malloc(sizeof(Local));
 	local->name = strdup(name);
+	local->value.refcount = 1;
 	local->value.type = type;
 	local->value.value = value;
 	return local;
@@ -269,12 +343,12 @@ Local *make_local(const char *name, DataType type, void *value)
 // Same as `bind_local`, but takes a pre-wrapped `DataValue`.
 void bind_data(Context *ctx, const char *name, DataValue *data)
 {
+	data = link_datavalue(data);  // Taking reference to the data.
 	bind_local(ctx, name, data->type, data->value);
 }
 
 // Locals is a dynamically growable array.
-void bind_local(Context *ctx, const char *name,
-	DataType type, void *value)
+void bind_local(Context *ctx, const char *name, DataType type, void *value)
 {
 	// Check capacity.
 	if (ctx->locals_count == ctx->locals_capacity) {
@@ -330,8 +404,11 @@ void bind_default_globals(Context *ctx)
 Context *make_context(const char *scope_name, Context *super_scope)
 {
 	Context *ctx = malloc(sizeof(Context));
-	ctx->superior = super_scope;
+	ctx->refcount = 1;
 	ctx->function = scope_name;
+	ctx->superior = super_scope;
+	if (ctx->superior != NULL)  // Increment reference count to superior scope.
+		++ctx->superior->refcount;
 
 	// Initialise with 6 free spaces for local variables.
 	// This may have to be reallocated if more than 6

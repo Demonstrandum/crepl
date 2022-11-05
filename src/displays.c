@@ -59,6 +59,7 @@ char *display_parampos(ParamPos pos)
 
 char *display_datatype(DataType type)
 {
+	static char unknown[] = "unknown-type-X";
 	switch (type) {
 	case T_NIL:
 		return "nil";
@@ -73,12 +74,14 @@ char *display_datatype(DataType type)
 	case T_STRING:
 		return "text-string";
 	default:
-		return "unknown-type";
+		unknown[sizeof(unknown) - 2] = '0' + (char)type;
+		return unknown;
 	}
 }
 
 char *display_parsetree(const ParseNode *tree)
 {
+	static char unknown[256] = { '\0' };
 	if (tree == NULL)
 		return "NULL";
 	switch (tree->type) {
@@ -127,7 +130,8 @@ char *display_parsetree(const ParseNode *tree)
 		return binary_str;
 	}
 	default:
-		return "[unknown-parse-node]";
+		sprintf(unknown, "[unknown-parse-node: %d]", tree->type);
+		return unknown;
 	}
 }
 

@@ -26,7 +26,31 @@ make  # Builds and compiles the project.
 sudo make install  # Installs the program system wide.
 ```
 
+## Example
+
+An example of a session:
+
+```console
+::> k = 9
+#=> 9
+::> f x = 2x - k
+::> f 10
+#=> 11
+::> addTo x = y -> x + y
+::> add3 = addTo 3
+::> add3 10
+#=> 13
+::> sum = x -> y -> x + y
+::> (sum 2) 3
+#=> 5
+::> sin 2pi - 1
+#=> -1
+::> (k-2)!
+#=> 5040
+```
+
 ## TODO
+
  - [ ] Temporary variables with `let ... in ...` and `... where ...` expressions.
  - [ ] Computed physical units with through postfix operators.
    - [ ] User defined units.
@@ -36,7 +60,9 @@ sudo make install  # Installs the program system wide.
  - [ ] User defined functions.
    - [x] Single argument.
    - [ ] Tuple argument.
+   - [x] Anonymous functions.
  - [ ] Garbage collection.
+   - [x] Reference count function scopes.
  - [ ] Numerical equation solver (polynomial, simultaneous, &c.).
  - [ ] Add more functionality, notably for calculus.
  - [ ] Symbol manipulation (?).

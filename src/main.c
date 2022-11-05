@@ -68,10 +68,13 @@ void *evaluation_thread(void *ctx_void)
 		return (void *)EXIT_FAILURE;
 	}
 
-	if (result != NULL)
-		printf("#=> %s\n", display_datavalue(result));
 	if (tree != NULL)
 		free_parsenode(tree);
+	if (result != NULL) {
+		printf("#=> %s\n", display_datavalue(result));
+		unlink_datavalue(result);
+	}
+
 
 	return (void *)EXIT_SUCCESS;
 }
@@ -155,6 +158,8 @@ int main(int argc, char **argv)
 		pthread_join(thread_id, NULL);
 		thread_id = 0;
 	} while (true);
+
+	unlink_context(ctx);
 
 	write_history(cache_loc);
 

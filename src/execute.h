@@ -3,6 +3,9 @@
 #include "defaults.h"
 #include "parse.h"
 
+/// Execution context / scope.
+struct _context;
+
 typedef enum {
 	T_NIL     = 1 << 0,  // Empty type.
 	T_NUMBER  = 1 << 1,  // NumberNode (ParsNode).
@@ -13,6 +16,7 @@ typedef enum {
 } DataType;
 
 typedef struct {
+	usize refcount;
 	DataType type;
 	void *value;
 } DataValue;
@@ -26,9 +30,10 @@ typedef struct {
 
 typedef struct {
 	char *name;
-	ParseNode *body;
+	const ParseNode *body;
 	usize arg_count;
 	char *args;  // NUL-delimited.
+	struct _context *scope;  // Scope the function was defined in.
 } Lambda;
 
 #define FUNC_PTR(FUNC_NAME) \
@@ -43,9 +48,9 @@ typedef struct {
 	DataValue value;
 } Local;
 
-struct _context;
 
 typedef struct _context {
+	usize refcount;
 	struct _context *superior;
 	const char *function;
 	// `locals` works as a dynamic array;
@@ -59,7 +64,12 @@ typedef enum {
 } ParamPos;
 
 void free_datavalue(DataValue *);
-Lambda *make_lambda(const char *, usize, const char *, ParseNode *);
+DataValue *link_datavalue(DataValue *);
+void unlink_datavalue(DataValue *);
+void free_context(Context *);
+Context *link_context(Context *);
+void unlink_context(Context *);
+Lambda *make_lambda(const char *, usize, const char *, Context *, const ParseNode *);
 void *type_check(const char *, ParamPos, DataType, const DataValue *);
 DataValue *execute(Context *, const ParseNode *);
 DataValue *wrap_data(DataType, void *);

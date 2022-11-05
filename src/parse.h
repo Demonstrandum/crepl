@@ -39,31 +39,32 @@ typedef struct {
 	Fixity fixity;
 } Operator;
 
-static const u16 FUNCTION_PRECEDENCE = 9;
+static const u16 FUNCTION_PRECEDENCE = 90;
 // Known operators from longest to shortests.
 static const Operator KNOWN_OPERATORS[] = {
 	// 3 characters long.
 	{ "not", 8, RIGHT_ASSOC, PREFIX },
 	// 2 characters long.
-	{ "**", 10, RIGHT_ASSOC, INFIX },
-	{ "<=", 4, LEFT_ASSOC, INFIX },
-	{ ">=", 4, LEFT_ASSOC, INFIX },
-	{ "==", 3, LEFT_ASSOC, INFIX },
-	{ "/=", 3, LEFT_ASSOC, INFIX },
+	{ "**", 100, RIGHT_ASSOC, INFIX },
+	{ "<=",  40,  LEFT_ASSOC, INFIX },
+	{ ">=",  40,  LEFT_ASSOC, INFIX },
+	{ "==",  30,  LEFT_ASSOC, INFIX },
+	{ "/=",  30,  LEFT_ASSOC, INFIX },
+	{ "->",  25, RIGHT_ASSOC, INFIX },
 	// 1 character long.
-	{ "-", 10, RIGHT_ASSOC, PREFIX },
-	{ "+", 10, RIGHT_ASSOC, PREFIX },
-	{ "¬", 10, RIGHT_ASSOC, PREFIX },
-	{ "!", 10, LEFT_ASSOC, POSTFIX },
-	{ "^", 10, RIGHT_ASSOC, INFIX },
-	{ "*", 6, LEFT_ASSOC, INFIX },
-	{ "/", 6, LEFT_ASSOC, INFIX },
-	{ "+", 5, LEFT_ASSOC, INFIX },
-	{ "-", 5, LEFT_ASSOC, INFIX },
-	{ ">", 4, LEFT_ASSOC, INFIX },
-	{ "<", 4, LEFT_ASSOC, INFIX },
-	{ "=", 2, RIGHT_ASSOC, INFIX },
-	{ ",", 1, RIGHT_ASSOC, INFIX },
+	{ "-", 100, RIGHT_ASSOC, PREFIX },
+	{ "+", 100, RIGHT_ASSOC, PREFIX },
+	{ "¬", 100, RIGHT_ASSOC, PREFIX },
+	{ "!", 100,  LEFT_ASSOC, POSTFIX },
+	{ "^", 100, RIGHT_ASSOC, INFIX },
+	{ "*",  60,  LEFT_ASSOC, INFIX },
+	{ "/",  60,  LEFT_ASSOC, INFIX },
+	{ "+",  50,  LEFT_ASSOC, INFIX },
+	{ "-",  50,  LEFT_ASSOC, INFIX },
+	{ ">",  40,  LEFT_ASSOC, INFIX },
+	{ "<",  40,  LEFT_ASSOC, INFIX },
+	{ "=",  20, RIGHT_ASSOC, INFIX },
+	{ ",",  10, RIGHT_ASSOC, INFIX },
 };
 
 // Parse tree nodes:
