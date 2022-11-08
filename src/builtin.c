@@ -86,7 +86,7 @@ DataValue *builtin_sleep(DataValue seconds)
 	if (time->value.i < 0) time->value.i = 0;
 
 	sleep((unsigned)time->value.i);
-	return wrap_data(T_NUMBER, time);
+	return heap_data(T_NUMBER, time);
 }
 
 #define MATH_WRAPPER(NAME, FUNC)\
@@ -103,11 +103,11 @@ DataValue *builtin_ ##NAME (DataValue input) \
 	tmp.value.f = FUNC(tmp.value.f); \
 	\
 	memcpy(new_num, &tmp, sizeof(NumberNode)); \
-	DataValue *result = wrap_data(T_NUMBER, new_num); \
+	DataValue *result = heap_data(T_NUMBER, new_num); \
 	return result; \
 }
 
-// This is cheaty, but hey oh.
+// This is cheaty, but hey.
 fsize nice_sin(fsize alpha)
 {
 	fsize multiples_of_pi = alpha / M_PI;
@@ -194,7 +194,7 @@ DataValue *builtin_neg(DataValue input)
 		return NULL;
 	}
 	}
-	DataValue *result = wrap_data(T_NUMBER, new_num);
+	DataValue *result = heap_data(T_NUMBER, new_num);
 	return result;
 }
 
@@ -210,7 +210,7 @@ DataValue *builtin_factorial(DataValue input)
 	memcpy(new_num, &tmp, sizeof(NumberNode));
 	new_num->value.f = gamma_complete(new_num->value.f + 1);
 
-	DataValue *result = wrap_data(T_NUMBER, new_num);
+	DataValue *result = heap_data(T_NUMBER, new_num);
 	result->value = new_num;
 	return result;
 }

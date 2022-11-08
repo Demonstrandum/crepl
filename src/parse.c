@@ -237,8 +237,8 @@ NumberNode *make_number(NumberType type, void *val)
 		break;
 	}
 	default:
-		printf("Never get here!\n\n");
-		break;
+		fprintf(stderr, "Unhandled number type: %d\n", type);
+		abort();
 	}
 	return num;
 }

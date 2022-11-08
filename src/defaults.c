@@ -1,5 +1,12 @@
 #include "defaults.h"
 
+const bool debug =
+#ifdef DEBUG
+	true;
+#else
+	false;
+#endif
+
 ssize ipow(ssize base, usize exp)
 {
     ssize result = 1;

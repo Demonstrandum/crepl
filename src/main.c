@@ -71,7 +71,10 @@ void *evaluation_thread(void *ctx_void)
 	if (tree != NULL)
 		free_parsenode(tree);
 	if (result != NULL) {
-		printf("#=> %s\n", display_datavalue(result));
+		printf("#=> %s", display_datavalue(result));
+		if (debug)
+			printf("    \033[2m(%p)\033[0m", result->value);
+		printf("\n");
 		unlink_datavalue(result);
 	}
 

@@ -26,6 +26,8 @@ make  # Builds and compiles the project.
 sudo make install  # Installs the program system wide.
 ```
 
+You may also compile with debug-printing by `DEFINES=-DDEBUG make` instead.
+
 ## Example
 
 An example of a session:
@@ -61,8 +63,10 @@ An example of a session:
    - [x] Single argument.
    - [ ] Tuple argument.
    - [x] Anonymous functions.
- - [ ] Garbage collection.
+ - [ ] Pool constant and literal values in a preallocated structure, to save on reallocating constants by preventing them from being garbage collected.
+ - [x] Garbage collection.
    - [x] Reference count function scopes.
+   - [x] Reference count data values.
  - [ ] Numerical equation solver (polynomial, simultaneous, &c.).
  - [ ] Add more functionality, notably for calculus.
  - [ ] Symbol manipulation (?).

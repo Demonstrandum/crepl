@@ -17,6 +17,7 @@ typedef enum {
 
 typedef struct {
 	usize refcount;
+	bool onstack;
 	DataType type;
 	void *value;
 } DataValue;
@@ -45,9 +46,8 @@ typedef struct {
 
 typedef struct {
 	const char *name;
-	DataValue value;
+	DataValue *value;
 } Local;
-
 
 typedef struct _context {
 	usize refcount;
@@ -72,10 +72,11 @@ void unlink_context(Context *);
 Lambda *make_lambda(const char *, usize, const char *, Context *, const ParseNode *);
 void *type_check(const char *, ParamPos, DataType, const DataValue *);
 DataValue *execute(Context *, const ParseNode *);
-DataValue *wrap_data(DataType, void *);
-Local *make_local(const char *, DataType, void *);
-void bind_local(Context *, const char *, DataType, void *);
-void bind_data(Context *, const char *, DataValue *);
+DataValue *wrap_data(DataType, void *, bool);
+DataValue *stack_data(DataType, void *);
+DataValue *heap_data(DataType, void *);
+Local make_local(const char *, DataValue *);
+void bind_local(Context *, const char *, DataValue *);
 void bind_builtin_functions(Context *);
 Context *init_context();
 Context *base_context();
