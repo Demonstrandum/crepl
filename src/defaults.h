@@ -24,6 +24,22 @@
 	#define INF (1.0 / 0.0)
 #endif
 
+#define array(type) struct { usize len; usize cap; type *buf; }
+#define make(type, size) { .len = 0, .cap = (size), .buf = malloc(sizeof(type) * (size)) }
+#define init(var, size) \
+    { \
+        (var).len = 0; \
+        (var).cap = size; \
+        (var).buf = malloc(sizeof(*(var).buf) * size); \
+    }
+#define grow(type, arr) \
+	if ((arr)->len >= (arr)->cap) { \
+		usize newsize = (arr)->len * 2 + 1; \
+		(arr)->cap = newsize; \
+		newsize *= sizeof(type); \
+		(arr)->buf = realloc((arr)->buf, newsize); \
+	}
+
 extern const bool debug;
 
 typedef uint8_t  u8;
@@ -95,4 +111,3 @@ byte *downcase(const byte *);
 #else
 	#define COMPILER "Unknown Compiler"
 #endif
-

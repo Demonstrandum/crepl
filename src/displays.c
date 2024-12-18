@@ -9,23 +9,15 @@
 
 char *display_nil(void)
 {
-	return "nil";
+	return strdup("nil");
 }
 
 char *display_lambda(Lambda *lambda)
 {
 	char *str = calloc(128, sizeof(char));
 	char *ptr = str;
-	ptr += sprintf(ptr, "<lambda %s of (", lambda->name);
-	char *arg_name = lambda->args;
-	for (usize i = 0; i < lambda->arg_count; ++i) {
-		usize offs = sprintf(ptr, "%s", arg_name);
-		arg_name += offs + 1;
-		ptr += offs;
-		ptr += sprintf(ptr, ", ");
-	}
-	ptr -= 2;  // remove trailing comma and space.
-	ptr += sprintf(ptr, ") at %p>", (void *)lambda);
+	ptr += sprintf(ptr, "<lambda %s", lambda->name);
+	ptr += sprintf(ptr, " at %p>", (void *)lambda);
 	return str;
 }
 
@@ -92,10 +84,10 @@ char *display_parsetree(const ParseNode *tree)
 		return display_numbernode(tree->node.number);
 	}
 	case STRING_NODE: {  // TODO: Escape the string.
-		usize l = strlen(tree->node.str.value);
-		byte *str = malloc(l + 2);
+		usize l = strlen((char *)tree->node.str.value);
+		char *str = malloc(l + 2);
 		str[0] = '"';
-		strcpy(str + 1, tree->node.str.value);
+		strcpy(str + 1, (char *)tree->node.str.value);
 		str[l + 1] = '"';
 		str[l + 2] = '\0';
 		return str;
@@ -140,7 +132,7 @@ char *display_datavalue(const DataValue *data)
 	char *string;
 
 	if (data == NULL)
-		return "internal-null-pointer";
+		return strdup("internal-null-pointer");
 
 	switch (data->type) {
 	case T_NIL: {
@@ -148,7 +140,7 @@ char *display_datavalue(const DataValue *data)
 	}
 	case T_NUMBER: {
 		if (data->value == NULL)
-			return "number-with-null-value";
+			return strdup("number-with-null-value");
 		NumberNode *num = data->value;
 		return display_numbernode(*num);
 	}
@@ -164,6 +156,31 @@ char *display_datavalue(const DataValue *data)
 	}
 	case T_LAMBDA: {
 		return display_lambda(data->value);
+	}
+	case T_TUPLE: {
+		Tuple *tuple = data->value;
+		usize cap = 128 * tuple->length; // guess.
+		usize totlen = 2; // '(' and ')'
+		string = calloc(cap, sizeof(char));
+		char *ptr = string;
+		ptr += sprintf(string, "(");
+		for (int i = tuple->length - 1; i >= 0; --i) {
+			DataValue *item = tuple->items[i];
+			char *substr = display_datavalue(item);
+			totlen += strlen(substr);
+			totlen += 2; // ',' and ' '
+			if (totlen >= cap) {
+				cap = totlen * 2; // new guess.
+				usize offs = ptr - string;
+				string = realloc(string, sizeof(char) * cap);
+				ptr = string + offs;
+			}
+			if (i == 0) ptr += sprintf(ptr, "%s",   substr);
+			else        ptr += sprintf(ptr, "%s, ", substr);
+			free(substr);
+		}
+		ptr += sprintf(ptr, ")");
+		break;
 	}
 	default:
 		string = malloc(sizeof(char) * 128); // Safe bet.

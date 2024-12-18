@@ -5,7 +5,12 @@
 #include "prelude.h"
 #include "displays.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 static const f32 LOCALS_REALLOC_GROWTH_FACTOR = 1.5;
 static const fsize ZERO = 0.0;
@@ -45,7 +50,7 @@ void free_datavalue(DataValue *data)
 void free_context(Context *ctx)
 {
 	if (debug)
-		fprintf(stderr, "destorying context: %s:\n", ctx->function);
+		fprintf(stderr, "destroying context: %s:\n", ctx->function);
 	// If this context is getting free'd,
 	// the superior context has one fewer references.
 	if (ctx->superior != NULL)
@@ -102,31 +107,21 @@ static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 	case IDENT_NODE: {
 		// Resolve variables by searching through local
 		// variables. If that fails, search through the
-		// superior sopes varaibles, repeat until there
+		// superior sopes variables, repeat until there
 		// are no more superior scopes, if the local is
 		// found yield its corresponding value, or else
 		// throw an execution error.
 		char *ident_name = stmt->node.ident.value;
-
-		Context *current_ctx = ctx;
-		while (current_ctx != NULL) {
-			for (usize i = 0; i < current_ctx->locals_count; ++i) {
-				Local *local = &current_ctx->locals[i];
-				if (strcmp(local->name, ident_name) == 0) {
-					free(data);
-					data = link_datavalue(local->value);  // another reference.
-					goto finished_search;
-				}
-			}
-			current_ctx = current_ctx->superior;
+		Local *local = search_locals(ctx, ident_name);
+		if (local != NULL) {
+			free(data);
+			data = link_datavalue(local->value);  // another reference.
+		} else {
+			ERROR_TYPE = EXECUTION_ERROR;
+			sprintf(ERROR_MSG, "Could not find variable `%s'\n"
+				"  in any local or superior scope.", ident_name);
+			return NULL;
 		}
-
-		ERROR_TYPE = EXECUTION_ERROR;
-		sprintf(ERROR_MSG, "Could not find variable `%s'\n"
-			"  in any local or superior scope.", ident_name);
-		return NULL;
-
-finished_search:
 		break;
 	}
 	case NUMBER_NODE: {
@@ -163,7 +158,7 @@ finished_search:
 			goto unary_discard;
 		}
 
-		// Otheriwse, we expect a lambda or function pointer as callee.
+		// Otherwise, we expect a lambda or function pointer as callee.
 		void *func = type_check("function", ARG, T_LAMBDA | T_FUNCTION_PTR, callee);
 		if (func == NULL) {
 			free(data);
@@ -179,11 +174,27 @@ finished_search:
 			Lambda *lambda = func;
 			// Make the function call frame / local execution context.
 			Context *local_ctx = make_context(lambda->name, lambda->scope);
-			// Bind the arguments to the local context.
-			// TODO: Make this a loop over the tuple if a tuple were provided.
-			bind_local(local_ctx, lambda->args, operand);
-			free(data);
-			data = recursive_execute(local_ctx, lambda->body);
+			bool did_match = false;
+			printf("\ntrying lambda call\n");
+			printf("there are %lu patterns\n", lambda->patterns.len);
+			for (usize i = 0; i < lambda->patterns.len; ++i) {
+				printf("trying patterm %lu\n", i);
+				// Go through patterns, attempting to match them.
+				Pattern *pat = &lambda->patterns.buf[i];
+				did_match = match_local(local_ctx, pat->pattern, operand);
+				if (did_match) {
+					// Evaluate body, and finish.
+					free(data);
+					data = recursive_execute(local_ctx, pat->body);
+					break;
+				}
+			}
+			if (!did_match) {
+				// Never matched.
+				ERROR_TYPE = EXECUTION_ERROR;
+				strcpy(ERROR_MSG, "No branch of the function matched against this argument.");
+				return NULL;
+			}
 			// Temporary execution context spent.
 			unlink_context(local_ctx);
 		} else {
@@ -221,16 +232,11 @@ unary_discard:
 				bind_local(ctx, lvalue, data);
 				break;
 			} else if (stmt->node.binary.left->type == UNARY_NODE) {
-				UnaryNode func = stmt->node.binary.left->node.unary;
+				const ParseNode *func_call = stmt->node.binary.left;
 				func_body = stmt->node.binary.right;
-				if (func.callee->type != IDENT_NODE) {
-					ERROR_TYPE = PARSE_ERROR;
-					strcpy(ERROR_MSG, "Function assignment must have"
-						" identifier as function name.");
-					return NULL;
-				}
-				func_name = func.callee->node.ident.value;
-				func_operand = func.operand;
+				Lambda *lam = register_lambda_pattern(ctx, func_call, func_body);
+				data = heap_data(T_LAMBDA, lam);
+				break;
 			} else {
 				ERROR_TYPE = PARSE_ERROR;
 				strcpy(ERROR_MSG, "Left of assignment (`=') operator\n"
@@ -241,26 +247,7 @@ unary_discard:
 			func_name = "<anon>";
 			func_operand = stmt->node.binary.left;
 			func_body = stmt->node.binary.right;
-		}
-
-		// Defines and binds a function.
-		if (func_body != NULL) {
-			// TODO: support tuples.
-			char *arg_names = strdup(func_operand->node.ident.value);
-			if (func_operand->type != IDENT_NODE) {
-				ERROR_TYPE = PARSE_ERROR;
-				strcpy(ERROR_MSG, "Function argument must be"
-					" single identifier or tuple of arguments.");
-				return NULL;
-			}
-			// TODO: handel NUL-delimted arg_names from tuple argument.
-			const ParseNode *body = clone_node(func_body);
-			Lambda *lambda = make_lambda(func_name, 1, arg_names, ctx, body);
-			free(data);
-			data = heap_data(T_LAMBDA, lambda);
-			if (func_name[0] != '<')
-				bind_local(ctx, func_name, data);
-			break;
+			abort(); // TODO.
 		}
 
 		free(data);
@@ -273,6 +260,38 @@ unary_discard:
 		if (rhs == NULL) {
 			unlink_datavalue(lhs);
 			return NULL;
+		}
+
+		// Tuples
+		if (strcmp(op, ",") == 0) {
+			if (rhs->type != T_TUPLE) {
+				// Create new tuple.
+				Tuple *tuple = malloc(sizeof(Tuple));
+				tuple->length = 2;
+				tuple->capacity = 2;
+				tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
+				tuple->items[0] = link_datavalue(rhs);
+				tuple->items[1] = link_datavalue(lhs);
+				data = heap_data(T_TUPLE, tuple);
+				break;
+			}
+			// RHS is a tuple, clone it and extend it.
+			Tuple *rhs_tuple = rhs->value;
+			Tuple *tuple = malloc(sizeof(Tuple));
+			tuple->length = rhs_tuple->length + 1;
+			tuple->capacity = rhs_tuple->capacity;
+			tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
+			// Copy old values;
+			for (usize i = 0; i < rhs_tuple->length; ++i)
+				tuple->items[i] = link_datavalue(rhs_tuple->items[i]);
+			// Grow capacity.
+			if (tuple->length >= tuple->capacity) {
+				tuple->capacity = 1.5 * tuple->length + 1;
+				tuple->items = realloc(tuple->items, tuple->capacity * sizeof(DataValue *));
+			}
+			tuple->items[rhs_tuple->length] = link_datavalue(lhs);
+			data = heap_data(T_TUPLE, tuple);
+			break;
 		}
 
 		// Numerical binary operations.
@@ -307,17 +326,6 @@ unary_discard:
 	}
 
 	return data;
-}
-
-Lambda *make_lambda(const char *name, usize arg_count, const char *args, Context *ctx, const ParseNode *body)
-{
-	Lambda *lambda = malloc(sizeof(Lambda));
-	lambda->name = strdup(name);
-	lambda->arg_count = arg_count;
-	lambda->args = (char *)args;
-	lambda->body = body;
-	lambda->scope = link_context(ctx);
-	return lambda;
 }
 
 DataValue *wrap_data(DataType type, void *value, bool onstack)
@@ -364,6 +372,154 @@ Local make_local(const char *name, DataValue *data)
 	};
 }
 
+
+static char *find_op_name(const ParseNode *unary)
+{
+	while (unary->type == UNARY_NODE)
+		unary = unary->node.unary.callee;
+
+	if (unary->type == IDENT_NODE)
+		return unary->node.ident.value;
+
+	return NULL;
+}
+
+Lambda *register_lambda_pattern(Context *ctx, const ParseNode *lhs, const ParseNode *rhs)
+{
+	char *func_name = find_op_name(lhs);
+	if (func_name == NULL) {
+		ERROR_TYPE = PARSE_ERROR;
+		strcpy(ERROR_MSG, "Function assignment must have"
+			" identifier as function name.");
+		return NULL;
+	}
+	Local *defined_func = search_locals(ctx, func_name);
+	if (defined_func != NULL) {
+		// Function exists, so register this as another pattern.
+		DataValue *val = defined_func->value;
+		if (val->type != T_LAMBDA) {
+			// Error.
+		}
+		Lambda *lam = (Lambda *)val->value;
+		append_pattern(lam, lhs, rhs);
+		return lam;
+	}
+
+	// Otherwise, we define a new lambda under this name.
+	Lambda *lam = malloc(sizeof(Lambda));
+	lam->name = strdup(func_name);
+	init(lam->patterns, 1);
+	append_pattern(lam, lhs, rhs);
+	lam->scope = ctx;
+	// Bind the lambda in this scope too.
+	bind_local(ctx, lam->name, heap_data(T_LAMBDA, lam));
+	return lam;
+}
+
+void append_pattern(Lambda *lambda, const ParseNode *pattern, const ParseNode *body)
+{
+	pattern = clone_node(pattern);
+	body = clone_node(body);
+
+	grow(Pattern, &lambda->patterns);
+	lambda->patterns.buf[lambda->patterns.len++] = (Pattern){
+		.pattern = pattern,
+		.body = body,
+	};
+}
+
+Local *search_locals(const Context *ctx, const char *ident_name)
+{
+	const Context *current_ctx = ctx;
+	while (current_ctx != NULL) {
+		for (usize i = 0; i < current_ctx->locals_count; ++i) {
+			Local *local = &current_ctx->locals[i];
+			if (strcmp(local->name, ident_name) == 0) {
+				return local;
+			}
+		}
+		current_ctx = current_ctx->superior;
+	}
+	return NULL;
+}
+
+// Use a computed value and match it against a pattern, binding
+// identifiers in the pattern  with the corresponding values if they did match.
+bool match_local(Context *ctx, const ParseNode *pat, DataValue *val)
+{
+	assert(ctx != NULL);
+	assert(pat != NULL);
+	assert(val != NULL);
+
+	// Handle function call syntax.
+	if (pat->type == UNARY_NODE) {
+		printf("matched unary\n");
+		const ParseNode *operand =  pat->node.unary.operand;
+		return match_local(ctx, operand, val);
+	}
+
+    // If pattern is an identifier, bind it to the value
+    if (pat->type == IDENT_NODE) {
+        bind_local(ctx, pat->node.ident.value, val);  // Cast away const as bind_local will handle linking
+        return true;
+    }
+
+    // Match number literals
+    if (pat->type == NUMBER_NODE && val->type == T_NUMBER) {
+        NumberNode *pattern_num = (NumberNode*)&pat->node.number;
+        NumberNode *value_num = (NumberNode*)val->value;
+
+        if (pattern_num->type != value_num->type) return false;
+
+        switch (pattern_num->type) {
+            case FLOAT:
+                return pattern_num->value.f == value_num->value.f;
+            case INT:
+                return pattern_num->value.i == value_num->value.i;
+            default:
+                return false;
+        }
+    }
+
+    // Match string literals
+    if (pat->type == STRING_NODE && val->type == T_STRING) {
+        StringNode *pattern_str = (StringNode*)&pat->node.str;
+        const char *value_str = (const char*)val->value;
+        return memcmp(pattern_str->value, value_str, pattern_str->len) == 0;
+    }
+
+    // Match tuples
+    if (val->type == T_TUPLE) {
+        Tuple *tuple = (Tuple*)val->value;
+
+        // Count pattern elements by walking the binary comma nodes
+        usize pattern_len = 1;
+        const ParseNode *curr = pat;
+        while (curr->type == BINARY_NODE &&
+                curr->node.binary.callee->type == IDENT_NODE &&
+                strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
+            pattern_len++;
+            curr = curr->node.binary.right;
+        }
+
+        if (pattern_len != tuple->length) return false;
+
+        // Match each element
+        usize tuple_idx = 0;
+        curr = pat;
+        while (curr->type == BINARY_NODE &&
+                curr->node.binary.callee->type == IDENT_NODE &&
+                strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
+            if (!match_local(ctx, curr->node.binary.left, &tuple->items[tuple_idx++]))
+                return false;
+            curr = curr->node.binary.right;
+        }
+        // Match the final element
+        return match_local(ctx, curr, &tuple->items[tuple_idx]);
+    }
+
+    return false;
+}
 
 // Locals is a dynamically growable array.
 void bind_local(Context *ctx, const char *name, DataValue *data)
@@ -435,7 +591,7 @@ Context *make_context(const char *scope_name, Context *super_scope)
 	ctx->locals_capacity = 6;
 	ctx->locals = malloc(sizeof(Local) * ctx->locals_capacity);
 
-	// Create an initial local varaible with the value of the
+	// Create an initial local variable with the value of the
 	// name of the function/scope.
 	Local this_scope = make_local("__this_scope",
 		stack_data(T_STRING, (void *)ctx->function));
@@ -444,12 +600,12 @@ Context *make_context(const char *scope_name, Context *super_scope)
 	ctx->locals[0] = this_scope;
 	ctx->locals[1] = ans;
 	// ^ Sets the first variable, default in every scope
-	// (good for debuggin purposes).
+	// (good for debugging purposes).
 
 	return ctx;
 }
 
-Context *base_context()
+Context *base_context(void)
 {
 	Context *ctx = init_context();
 	bind_default_globals(ctx); // Global variables.
@@ -460,7 +616,7 @@ Context *base_context()
 }
 
 // Create main parent context.
-Context *init_context()
+Context *init_context(void)
 {
 	return make_context("<main>", NULL);
 }

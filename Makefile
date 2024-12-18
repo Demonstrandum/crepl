@@ -16,9 +16,9 @@ endif
 all: clean $(TARGET)
 	@printf "\033[1mBuilt \`$(TARGET)' successfully.\033[0m\n"
 
-debug: OPT := -Og
+debug: OPT := -Og -g
 debug: $(OBJS)
-	$(CC) -Og -o $(TARGET) $(OBJS) $(LINKS)
+	$(CC) -Og -g -o $(TARGET) $(OBJS) $(LINKS)
 
 gui: CFLAGS := $(CFLAGS) -DGUI $(shell pkg-config --cflags gtk+-3.0)
 gui: LINKS := $(LINKS) $(shell pkg-config --libs gtk+-3.0)
