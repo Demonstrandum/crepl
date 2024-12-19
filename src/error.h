@@ -14,4 +14,4 @@ const char *error_name(error_t);
 extern error_t ERROR_TYPE;
 extern char ERROR_MSG[256];
 
-void handle_error();
+void handle_error(void);

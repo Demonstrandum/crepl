@@ -26,7 +26,7 @@ const char *error_name(error_t err)
 error_t ERROR_TYPE = NO_ERROR;
 char ERROR_MSG[256] = DEFAULT_ERROR_MSG;
 
-void handle_error()
+void handle_error(void)
 {
 	if (ERROR_TYPE == NO_ERROR)
 		return;
@@ -38,4 +38,3 @@ void handle_error()
 	ERROR_TYPE = NO_ERROR;
 	strcpy(ERROR_MSG, DEFAULT_ERROR_MSG);
 }
-

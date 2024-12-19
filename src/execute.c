@@ -34,14 +34,27 @@ DataValue *link_datavalue(DataValue *data)
 
 void unlink_datavalue(DataValue *data)
 {
+#if DEBUG
+	char *val = display_datavalue(data);
+	char *typ = display_datatype(data->type);
+	printf("unlinking `%s` (%s); ref count = %lu\n", val, typ, data->refcount - 1);
+	free(val);
+#endif
 	if (--data->refcount == 0) free_datavalue(data);
 }
 
 inline
 void free_datavalue(DataValue *data)
 {
-	if (debug)
+#if DEBUG
 		fprintf(stderr, "freeing data(stack: %d): %s    \033[2m(%p)\033[0m\n", data->onstack, display_datavalue(data), data->value);
+#endif
+	// Aggregate types must unlink children when freed.
+	if (data->type == T_TUPLE) {
+		Tuple *tup = data->value;
+		for (usize i = 0; i < tup->length; ++i)
+			unlink_datavalue(tup->items[i]);
+	}
 	if (!data->onstack)
 		free(data->value);
 	free(data);  // data-wrapper itself is always malloc'd.
@@ -49,16 +62,18 @@ void free_datavalue(DataValue *data)
 
 void free_context(Context *ctx)
 {
-	if (debug)
+#if DEBUG
 		fprintf(stderr, "destroying context: %s:\n", ctx->function);
+#endif
 	// If this context is getting free'd,
 	// the superior context has one fewer references.
 	if (ctx->superior != NULL)
 		unlink_context(ctx->superior);
 	// Unlink all references from locals.
 	for (usize i = 0; i < ctx->locals_count; ++i) {
-		if (debug)
+#if DEBUG
 			fprintf(stderr, "  unlinked local data (ref: %zu): %s    \033[2m(%p)\033[0m\n", ctx->locals[i].value->refcount - 1, display_datavalue(ctx->locals[i].value), ctx->locals[i].value->value);
+#endif
 		unlink_datavalue(ctx->locals[i].value);
 	}
 	// Free dynamic array of locals.
@@ -77,6 +92,9 @@ Context *link_context(Context *ctx)
 /// i.e. decrements reference count.
 void unlink_context(Context *ctx)
 {
+#if DEBUG
+	fprintf(stderr, "unlinking context `%s`; ref count = %lu\n", ctx->function, ctx->refcount - 1);
+#endif
 	if (--ctx->refcount == 0) free_context(ctx);
 }
 
@@ -142,6 +160,7 @@ static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 		DataValue *callee  = recursive_execute(ctx, stmt->node.unary.callee);
 		DataValue *operand = recursive_execute(ctx, stmt->node.unary.operand);
 
+
 		if (callee == NULL || operand == NULL) {
 			if (callee != NULL) unlink_datavalue(callee);
 			if (operand != NULL) unlink_datavalue(operand);
@@ -175,10 +194,7 @@ static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 			// Make the function call frame / local execution context.
 			Context *local_ctx = make_context(lambda->name, lambda->scope);
 			bool did_match = false;
-			printf("\ntrying lambda call\n");
-			printf("there are %lu patterns\n", lambda->patterns.len);
 			for (usize i = 0; i < lambda->patterns.len; ++i) {
-				printf("trying patterm %lu\n", i);
 				// Go through patterns, attempting to match them.
 				Pattern *pat = &lambda->patterns.buf[i];
 				did_match = match_local(local_ctx, pat->pattern, operand);
@@ -224,30 +240,42 @@ unary_discard:
 		char *op = ident.value;
 		// Equality is special:
 		if (strcmp(op, "=") == 0) {
-			if (stmt->node.binary.left->type == IDENT_NODE) {
-				char *lvalue = stmt->node.binary.left->node.ident.value;
-				free(data);
-				data = recursive_execute(ctx, stmt->node.binary.right);
-				if (data == NULL) return NULL;
-				bind_local(ctx, lvalue, data);
-				break;
-			} else if (stmt->node.binary.left->type == UNARY_NODE) {
+			if (stmt->node.binary.left->type == UNARY_NODE) {
 				const ParseNode *func_call = stmt->node.binary.left;
 				func_body = stmt->node.binary.right;
 				Lambda *lam = register_lambda_pattern(ctx, func_call, func_body);
-				data = heap_data(T_LAMBDA, lam);
+				free(data);
+				Local *found = search_locals(ctx, lam->name);
+				if (found == NULL) {
+					// Bind the lambda in this scope if it does not exist yet.
+					data = heap_data(T_LAMBDA, lam);
+					bind_local(ctx, lam->name, data);
+				} else {
+					// Othwise, just return a reference to the lambda.
+					data = link_datavalue(found->value);
+				}
 				break;
 			} else {
-				ERROR_TYPE = PARSE_ERROR;
-				strcpy(ERROR_MSG, "Left of assignment (`=') operator\n"
-					"  must be an identifier or function application.");
-				return NULL;
+				const ParseNode *lvalue = stmt->node.binary.left;
+				const ParseNode *rvalue = stmt->node.binary.right;
+				free(data);
+				data = recursive_execute(ctx, rvalue);
+				if (data == NULL) return NULL;
+				if (!match_local(ctx, lvalue, data)) {
+					ERROR_TYPE = EXECUTION_ERROR;
+					strcpy(ERROR_MSG, "Mismatched left hand side of expression.");
+					return NULL;
+				}
+				break;
 			}
 		} else if (strcmp(op, "->") == 0) {  // Lambda expression.
 			func_name = "<anon>";
 			func_operand = stmt->node.binary.left;
 			func_body = stmt->node.binary.right;
-			abort(); // TODO.
+			Lambda *lam = make_lambda(ctx, func_name, func_operand, func_body);
+			free(data);
+			data = heap_data(T_LAMBDA, lam);
+			break;
 		}
 
 		free(data);
@@ -411,8 +439,16 @@ Lambda *register_lambda_pattern(Context *ctx, const ParseNode *lhs, const ParseN
 	init(lam->patterns, 1);
 	append_pattern(lam, lhs, rhs);
 	lam->scope = ctx;
-	// Bind the lambda in this scope too.
-	bind_local(ctx, lam->name, heap_data(T_LAMBDA, lam));
+	return lam;
+}
+
+Lambda *make_lambda(Context *ctx, const char *name, const ParseNode *operand, const ParseNode *body)
+{
+	Lambda *lam = malloc(sizeof(Lambda));
+	lam->name = strdup(name);
+	init(lam->patterns, 1);
+	append_pattern(lam, operand, body);
+	lam->scope = ctx;
 	return lam;
 }
 
@@ -421,8 +457,9 @@ void append_pattern(Lambda *lambda, const ParseNode *pattern, const ParseNode *b
 	pattern = clone_node(pattern);
 	body = clone_node(body);
 
+	usize last = lambda->patterns.len++;
 	grow(Pattern, &lambda->patterns);
-	lambda->patterns.buf[lambda->patterns.len++] = (Pattern){
+	lambda->patterns.buf[last] = (Pattern){
 		.pattern = pattern,
 		.body = body,
 	};
@@ -505,17 +542,18 @@ bool match_local(Context *ctx, const ParseNode *pat, DataValue *val)
         if (pattern_len != tuple->length) return false;
 
         // Match each element
-        usize tuple_idx = 0;
+        ssize tuple_idx = tuple->length - 1;
         curr = pat;
-        while (curr->type == BINARY_NODE &&
-                curr->node.binary.callee->type == IDENT_NODE &&
-                strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
-            if (!match_local(ctx, curr->node.binary.left, &tuple->items[tuple_idx++]))
+        while (curr->type == BINARY_NODE
+            && curr->node.binary.callee->type == IDENT_NODE
+            && strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
+            if (tuple_idx < 0) return false;
+            if (!match_local(ctx, curr->node.binary.left, tuple->items[tuple_idx--]))
                 return false;
             curr = curr->node.binary.right;
         }
         // Match the final element
-        return match_local(ctx, curr, &tuple->items[tuple_idx]);
+        return match_local(ctx, curr, tuple->items[tuple_idx]);
     }
 
     return false;

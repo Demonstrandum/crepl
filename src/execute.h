@@ -26,14 +26,17 @@ typedef struct {
 typedef struct {
 	usize length;
 	usize capacity;
-	DataValue *items;
+	DataValue **items;
 } Tuple;
 
 typedef struct {
+    const ParseNode *pattern;
+    const ParseNode *body;
+} Pattern;
+
+typedef struct {
 	char *name;
-	const ParseNode *body;
-	usize arg_count;
-	char *args;  // NUL-delimited.
+	array(Pattern) patterns;
 	struct _context *scope;  // Scope the function was defined in.
 } Lambda;
 
@@ -69,15 +72,19 @@ void unlink_datavalue(DataValue *);
 void free_context(Context *);
 Context *link_context(Context *);
 void unlink_context(Context *);
-Lambda *make_lambda(const char *, usize, const char *, Context *, const ParseNode *);
+Lambda *register_lambda_pattern(Context *, const ParseNode *, const ParseNode *);
+Lambda *make_lambda(Context *, const char *, const ParseNode *, const ParseNode *);
+void append_pattern(Lambda *, const ParseNode *, const ParseNode *);
 void *type_check(const char *, ParamPos, DataType, const DataValue *);
 DataValue *execute(Context *, const ParseNode *);
 DataValue *wrap_data(DataType, void *, bool);
 DataValue *stack_data(DataType, void *);
 DataValue *heap_data(DataType, void *);
+Local *search_locals(const Context *, const char *);
 Local make_local(const char *, DataValue *);
 void bind_local(Context *, const char *, DataValue *);
+bool match_local(Context *, const ParseNode *, DataValue *);
 void bind_builtin_functions(Context *);
-Context *init_context();
-Context *base_context();
+Context *init_context(void);
+Context *base_context(void);
 Context *make_context(const char *, Context *);
