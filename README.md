@@ -103,7 +103,7 @@ quoted variables `f ([x], [a])` becomes `[x^3 + 2x + a].
 
 ## TODO
 
- - [ ] Temporary variables with `let ... in ...` and `... where ...` expressions.
+ - [x] Temporary variables with `let ... in ...` and `... where ...` expressions.
  - [ ] Computed physical units with through postfix operators.
    - [ ] User defined units.
  - [ ] A `ref(.)` function, for referencing/aliasing other variables.

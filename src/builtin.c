@@ -198,6 +198,16 @@ DataValue *builtin_neg(DataValue input)
 	return result;
 }
 
+DataValue *builtin_pos(DataValue input)
+{
+	NumberNode *num = type_check("+", RHS, T_NUMBER, &input);
+	if (num == NULL)
+		return NULL;
+	NumberNode *new_num = malloc(sizeof(NumberNode));
+	memcpy(new_num, num, sizeof(NumberNode));
+	return heap_data(T_NUMBER, new_num);
+}
+
 DataValue *builtin_factorial(DataValue input)
 {
 	NumberNode *num = type_check("!", LHS, T_NUMBER, &input);
@@ -281,4 +291,3 @@ NumberNode *num_pow(NumberNode lhs, NumberNode rhs)
 	result = realloc(result, sizeof(NumberNode));
 	return result;
 }
-

@@ -325,6 +325,36 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		break;
 	}
 	case TT_IDENTIFIER: {
+		// Parse `let`-`in` expressions.
+		if (strcmp(token->value, "let") == 0) {
+			ParseNode *bindings = parse_expr(rest, min_prec);
+			if (bindings == NULL) {
+				ERROR_TYPE = PARSE_ERROR;
+				sprintf(ERROR_MSG, "Missing bindings in let-in expression.");
+				return NULL;
+			}
+			token = lex(rest);
+			if (token == NULL || strcmp(token->value, "in") != 0) {
+				ERROR_TYPE = PARSE_ERROR;
+				sprintf(ERROR_MSG, "Unfinished `let ... in ...` expression. Missing `in`.");
+				return NULL;
+			}
+			ParseNode *expr = parse_expr(rest, min_prec);
+			if (expr == NULL) {
+				ERROR_TYPE = PARSE_ERROR;
+				sprintf(ERROR_MSG, "Missing result in let-in expression.");
+				return NULL;
+			}
+			node->type = BINARY_NODE;
+			ParseNode *callee = malloc(sizeof(ParseNode));
+			callee->type = IDENT_NODE;
+			callee->node.ident = (IdentNode){ .value = strdup("let-in") };
+			node->node.binary.callee = callee;
+			node->node.binary.left = bindings;
+			node->node.binary.right = expr;
+			break;
+		}
+		// Otherwise, just produce an ident.
 		node_into_ident(token->value, node);
 		break;
 	}
@@ -338,7 +368,7 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 	case TT_OPERATOR: {
 		// Verify this is a prefix operator.
 		bool is_prefix = false;
-		u16 precedence = 0;
+		iprec precedence = min_prec;
 		for (usize i = 0; i < len(KNOWN_OPERATORS); ++i) {
 			Operator op = KNOWN_OPERATORS[i];
 			if (strcmp(token->value, op.value) == 0 && op.fixity == PREFIX) {
@@ -376,7 +406,7 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 		break;
 	}
 	case TT_LPAREN: {
-		node = parse_expr(rest, 0);
+		node = parse_expr(rest, min_prec);
 		token = lex(rest);
 		if (token == NULL || token->type != TT_RPAREN) {
 			ERROR_TYPE = PARSE_ERROR;
@@ -394,11 +424,14 @@ ParseNode *parse_prefix(const Token *token, char **rest)
 	return node;
 }
 
-u16 token_precedence(Token *token)
+iprec token_precedence(Token *token)
 {
 	// Check if its an `)'.
 	if (token->type == TT_RPAREN)
 		return 0;
+	if (token->type == TT_IDENTIFIER && strcmp(token->value, "in") == 0) {
+		return 0;
+	}
 	// Check if its an operator.
 	for (usize i = 0; i < len(KNOWN_OPERATORS); ++i) {
 		Operator op = KNOWN_OPERATORS[i];
@@ -413,11 +446,11 @@ u16 token_precedence(Token *token)
 
 ParseNode *parse_infix(const ParseNode *left,
 	const Token *token,
-	char **rest, u16 last_precedence)
+	char **rest, iprec last_precedence)
 {
 	bool is_postfix = false;
 	bool is_operator = false;
-	u16 precedence = 0;
+	iprec precedence = min_prec;
 	Associativity assoc = NEITHER_ASSOC;
 
 	// Extract information on operator (if operator at all)
@@ -469,7 +502,7 @@ ParseNode *parse_infix(const ParseNode *left,
 	}
 
 	// Trick for right associativity is to pretend that what's
-	// to the left of you is sligtly higher precedence.
+	// to the left of you is slightly higher precedence.
 	if (assoc == RIGHT_ASSOC)
 		precedence -= 1;
 
@@ -514,14 +547,24 @@ ParseNode *parse_infix(const ParseNode *left,
 	return binary_node;
 }
 
-ParseNode *parse_expr(char **slice, u16 precedence)
+ParseNode *parse_expr(char **slice, iprec precedence)
 {
-	Token *token = lex(slice);
+	Token *token = peek(slice);
 
 	if (token == NULL)
 		return NULL;
 
+	// Never consume a `)` or `in` token.
+	switch (token->type) {
+		case TT_RPAREN: return NULL;
+		case TT_IDENTIFIER: if (strcmp(token->value, "in") == 0) return NULL;
+		default: break;
+	}
+
+	// Advance tokens.
+	token = lex(slice);
 	ParseNode *left = parse_prefix(token, slice);
+
 
 	if (left == NULL)
 		return NULL;
@@ -531,8 +574,8 @@ ParseNode *parse_expr(char **slice, u16 precedence)
 	if (token_ahead == NULL)
 		return left;
 
-	u16 current_precedence = token_precedence(token_ahead);
-	u16 previous_precedence = 0;
+	iprec current_precedence = token_precedence(token_ahead);
+	iprec previous_precedence = min_prec;
 
 	usize count = 0;
 	while (precedence < current_precedence) {
@@ -572,7 +615,7 @@ ParseNode *parse(const char *source)
 {
 	char *stepper = strdup(source);
 	char *start = stepper;
-	ParseNode *tree = parse_expr(&stepper, 0);
+	ParseNode *tree = parse_expr(&stepper, min_prec);
 	free(start);
 	return tree;
 }

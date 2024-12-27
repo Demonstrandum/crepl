@@ -321,6 +321,58 @@ unary_discard:
 			break;
 		}
 
+		// `let ... in ...` operator.
+		if (strcmp(op, "let-in") == 0) {
+			// Evaluate left first (in its own scope), then right.
+			// Discard left, return right.
+			Context *sub = make_context("<let-clause>", ctx);
+			DataValue *lhs = recursive_execute(sub, stmt->node.binary.left);
+			// Evaluated LHS bindings, execute RHS in new context `delta`.
+			Context *delta = make_context("<let-expr>", sub);
+			DataValue *rhs = recursive_execute(delta, stmt->node.binary.right);
+			// Use bindings made in `delta` to update current `ctx`.
+			for (usize i = 0; i < delta->locals_count; ++i) {
+				Local local = delta->locals[i];
+				bind_local(ctx, local.name, local.value);
+			}
+			// Finished with `delta` scope.
+			unlink_context(delta);
+			// Discard LHS after computing RHS.
+			unlink_datavalue(lhs);
+			unlink_context(sub);
+			// Return RHS.
+			free(data);
+			data = link_datavalue(rhs);
+			unlink_datavalue(rhs);
+			break;
+		}
+
+		// `where` operator.
+		if (strcmp(op, "where") == 0) {
+			// Evaluate right first (in its own scope), then left.
+			// Discard right, return left.
+			Context *sub = make_context("<where-clause>", ctx);
+			DataValue *rhs = recursive_execute(sub, stmt->node.binary.right);
+			// Evaluated RHS bindings, execute LHS in new context `delta`.
+			Context *delta = make_context("<where-expr>", sub);
+			DataValue *lhs = recursive_execute(delta, stmt->node.binary.left);
+			// Use bindings made in `delta` to update current `ctx`.
+			for (usize i = 0; i < delta->locals_count; ++i) {
+				Local local = delta->locals[i];
+				bind_local(ctx, local.name, local.value);
+			}
+			// Finished with `delta` scope.
+			unlink_context(delta);
+			// Discard RHS after computing LHS.
+			unlink_datavalue(rhs);
+			unlink_context(sub);
+			// Return LHS.
+			free(data);
+			data = link_datavalue(lhs);
+			unlink_datavalue(lhs);
+			break;
+		}
+
 		free(data);
 		// How to evaluate specific operators.
 		DataValue *lhs = recursive_execute(ctx, stmt->node.binary.left);
@@ -344,7 +396,7 @@ unary_discard:
 				tuple->items[0] = link_datavalue(rhs);
 				tuple->items[1] = link_datavalue(lhs);
 				data = heap_data(T_TUPLE, tuple);
-				break;
+				goto binary_discard;
 			}
 			// RHS is a tuple, clone it and extend it.
 			Tuple *rhs_tuple = rhs->value;
@@ -362,7 +414,15 @@ unary_discard:
 			}
 			tuple->items[rhs_tuple->length] = link_datavalue(lhs);
 			data = heap_data(T_TUPLE, tuple);
-			break;
+			goto binary_discard;
+		}
+
+		// Semicolons
+		if (strcmp(op, ";") == 0) {
+			// Evaluate the left, then the right.
+			// Discard the left, return the right.
+			data = link_datavalue(rhs);
+			goto binary_discard;
 		}
 
 		// Numerical binary operations.
@@ -383,6 +443,7 @@ unary_discard:
 			data = NULL;
 		}
 		// Operation operands are discarded.
+binary_discard:
 		unlink_datavalue(lhs);
 		unlink_datavalue(rhs);
 		break;
@@ -705,9 +766,9 @@ void bind_local(Context *ctx, const char *name, DataValue *data)
 	}
 
 	// Check capacity.
-	if (ctx->locals_count == ctx->locals_capacity) {
+	if (ctx->locals_count >= ctx->locals_capacity) {
 		// Grow array.
-		ctx->locals_capacity *= LOCALS_REALLOC_GROWTH_FACTOR;
+		ctx->locals_capacity *= LOCALS_REALLOC_GROWTH_FACTOR + 1;
 		ctx->locals = realloc(ctx->locals,
 			sizeof(Local) * ctx->locals_capacity);
 	}
