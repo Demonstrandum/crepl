@@ -34,9 +34,18 @@ typedef struct {
     const ParseNode *body;
 } Pattern;
 
-typedef struct {
+typedef struct _lambda_pattern {
+    const ParseNode *pattern;
+    enum { ParseNodeBody, LambdaBody } body_type;
+    union {
+        const struct _lambda *lambda;
+        const ParseNode *body;
+    };
+} LambdaPattern;
+
+typedef struct _lambda {
 	char *name;
-	array(Pattern) patterns;
+	array(LambdaPattern) patterns;
 	struct _context *scope;  // Scope the function was defined in.
 } Lambda;
 

@@ -196,12 +196,22 @@ static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 			bool did_match = false;
 			for (usize i = 0; i < lambda->patterns.len; ++i) {
 				// Go through patterns, attempting to match them.
-				Pattern *pat = &lambda->patterns.buf[i];
-				did_match = match_local(local_ctx, pat->pattern, operand);
+				LambdaPattern *lampat = &lambda->patterns.buf[i];
+				did_match = match_local(local_ctx, lampat->pattern, operand);
 				if (did_match) {
 					// Evaluate body, and finish.
 					free(data);
-					data = recursive_execute(local_ctx, pat->body);
+					switch (lampat->body_type) {
+						case ParseNodeBody: {
+							data = recursive_execute(local_ctx, lampat->body);
+						} break;
+						case LambdaBody: {
+							Lambda *nested_lambda = malloc(sizeof(Lambda));
+							*nested_lambda = *lampat->lambda; // Shallow copy.
+							nested_lambda->scope = link_context(local_ctx);
+							data = heap_data(T_LAMBDA, nested_lambda);
+						} break;
+					}
 					break;
 				}
 			}
@@ -452,17 +462,74 @@ Lambda *make_lambda(Context *ctx, const char *name, const ParseNode *operand, co
 	return lam;
 }
 
-void append_pattern(Lambda *lambda, const ParseNode *pattern, const ParseNode *body)
-{
-	pattern = clone_node(pattern);
-	body = clone_node(body);
 
-	usize last = lambda->patterns.len++;
-	grow(Pattern, &lambda->patterns);
-	lambda->patterns.buf[last] = (Pattern){
-		.pattern = pattern,
-		.body = body,
+// Append a pattern+body to a lambda, given a call pattern.
+// e.g. a curried function
+// 	  (((f a) b) c) = defn
+// becomes a lambda
+// 	  lam { pat = a; body = lam { pat = b; body = lam { pat = c; body = defn } } }
+void append_pattern(Lambda *lambda, const ParseNode *call, const ParseNode *body)
+{
+	// Basic case: Not curried.
+	if (call->node.unary.callee->type != UNARY_NODE) {
+		usize last = lambda->patterns.len++;
+		grow(Pattern, &lambda->patterns);
+		lambda->patterns.buf[last] = (LambdaPattern){
+			.pattern = clone_node(call->node.unary.operand),
+			.body_type = ParseNodeBody,
+			.body = clone_node(body),
+		};
+		return;
+	}
+
+	// Create the innermost lambda which will evaluate to the body.
+	Lambda *nested_lambda = malloc(sizeof(Lambda));
+	nested_lambda->scope = NULL; // This gets determined at the callsite.
+	nested_lambda->name = "<curried>";
+	init(nested_lambda->patterns, 1);
+	nested_lambda->patterns.len++;
+	grow(Pattern, &nested_lambda->patterns);
+	nested_lambda->patterns.buf[0] = (LambdaPattern){
+		.pattern = clone_node(call->node.unary.operand),
+		.body_type = ParseNodeBody,
+		.body = clone_node(body),
 	};
+
+	// Examine rest of calls.
+	call = call->node.unary.callee;
+	// Drill down the function calls to find each pattern in a curried defn.
+	while (call->type == UNARY_NODE) {
+		if (call->node.unary.callee->type != UNARY_NODE) {
+			// Final lambda node wraps the nested lambda.
+			//   lam { pat = call->node.unary.operand, body = nested_lam }
+			usize last = lambda->patterns.len++;
+			grow(Pattern, &lambda->patterns);
+			LambdaPattern pat = {
+				.pattern = clone_node(call->node.unary.operand),
+				.body_type = LambdaBody,
+				.lambda = nested_lambda,
+			};
+			lambda->patterns.buf[last] = pat;
+			return;
+		} else {
+			// Wrap the previous lambda in another lambda, and set
+			// nested_lambda to that wrapping lambda.
+			//   nested_lambda -> lam { body = nested_lambda }
+			Lambda *outer_lambda = malloc(sizeof(Lambda));
+			outer_lambda->name = "<curried>";
+			outer_lambda->scope = NULL;
+			init(outer_lambda->patterns, 1);
+			outer_lambda->patterns.len++;
+			grow(Pattern, &outer_lambda->patterns);
+			outer_lambda->patterns.buf[0] = (LambdaPattern){
+				.pattern = clone_node(call->node.unary.operand),
+				.body_type = LambdaBody,
+				.lambda = nested_lambda,
+			};
+			nested_lambda = outer_lambda;
+		}
+		call = call->node.unary.callee;
+	}
 }
 
 Local *search_locals(const Context *ctx, const char *ident_name)
@@ -487,13 +554,6 @@ bool match_local(Context *ctx, const ParseNode *pat, DataValue *val)
 	assert(ctx != NULL);
 	assert(pat != NULL);
 	assert(val != NULL);
-
-	// Handle function call syntax.
-	if (pat->type == UNARY_NODE) {
-		printf("matched unary\n");
-		const ParseNode *operand =  pat->node.unary.operand;
-		return match_local(ctx, operand, val);
-	}
 
     // If pattern is an identifier, bind it to the value
     if (pat->type == IDENT_NODE) {
