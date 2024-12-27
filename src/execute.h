@@ -76,6 +76,7 @@ typedef enum {
 } ParamPos;
 
 void free_datavalue(DataValue *);
+DataValue *copy_data(DataValue *);
 DataValue *link_datavalue(DataValue *);
 void unlink_datavalue(DataValue *);
 void free_context(Context *);

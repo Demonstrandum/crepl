@@ -177,6 +177,39 @@ static DataValue *recursive_execute(Context *ctx, const ParseNode *stmt)
 			goto unary_discard;
 		}
 
+		// Tuples are essentially functions from the set of indices {1,...,N}
+		// to the value at that index.
+		if (callee->type == T_TUPLE && operand->type == T_NUMBER) {
+			Tuple *tup = callee->value;
+			NumberNode *idx = operand->value;
+			if (idx->type != INT) {
+				ERROR_TYPE = TYPE_ERROR;
+				strcpy(ERROR_MSG, "Can only index tuple with integer.");
+				return NULL;
+			}
+			ssize n = idx->value.i;
+			usize len = tup->length;
+			if (n > (ssize)len || n == 0) {
+				ERROR_TYPE = EXECUTION_ERROR;
+				sprintf(ERROR_MSG, "Index %ld out of range for tuple of length %lu.", n, len);
+				return NULL;
+			}
+			if (n < 0) n = len + n + 1;
+			if (n < 0 || n > (ssize)len || n == 0) {
+				// Still negative, means index was out of range.
+				ERROR_TYPE = EXECUTION_ERROR;
+				sprintf(ERROR_MSG, "Index %ld out of range for tuple of length %lu.", n, len);
+				return NULL;
+			}
+			// tuples are 1-indexed.
+			usize i = n - 1;
+			DataValue *val = tup->items[len - i - 1];
+			free(data);
+			// Copy the contained value.
+			data = copy_data(val);
+			goto unary_discard;
+		}
+
 		// Otherwise, we expect a lambda or function pointer as callee.
 		void *func = type_check("function", ARG, T_LAMBDA | T_FUNCTION_PTR, callee);
 		if (func == NULL) {
@@ -399,6 +432,39 @@ void *type_check(const char *function_name, ParamPos pos,
 		value == NULL
 			? "null-pointer"
 			: display_datatype(value->type));
+	return NULL;
+}
+
+// Shallow copy of DataValue.
+DataValue *copy_data(DataValue *data)
+{
+	switch (data->type) {
+		case T_NIL: return (DataValue *)&nil;
+		case T_TUPLE: {
+			Tuple *tup = malloc(sizeof(Tuple));
+			*tup = *(Tuple *)data->value;
+			return heap_data(T_TUPLE, tup);
+		}
+		case T_LAMBDA: {
+			Lambda *lam = malloc(sizeof(Lambda));
+			*lam = *(Lambda *)data->value;
+			return heap_data(T_LAMBDA, lam);
+		}
+		case T_NUMBER: {
+			NumberNode *num = malloc(sizeof(NumberNode));
+			*num = *(NumberNode *)data->value;
+			return heap_data(T_NUMBER, num);
+		}
+		case T_STRING: {
+			char *str = strdup(data->value);
+			return heap_data(T_STRING, str);
+		}
+		case T_FUNCTION_PTR: {
+			FnPtr *fn = malloc(sizeof(FnPtr));
+			*fn = *(FnPtr *)data->value;
+			return heap_data(T_FUNCTION_PTR, fn);
+		}
+	}
 	return NULL;
 }
 
