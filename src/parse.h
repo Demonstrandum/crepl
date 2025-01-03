@@ -52,6 +52,7 @@ static const Operator KNOWN_OPERATORS[] = {
     { "where", 5, RIGHT_ASSOC, INFIX },
 	// 3 characters long.
 	{ "not", 25, RIGHT_ASSOC, PREFIX },
+	{ "...", 45,  LEFT_ASSOC, PREFIX },
 	// 2 characters long.
 	{ "**", 100, RIGHT_ASSOC, INFIX },
 	{ "<=",  40,  LEFT_ASSOC, INFIX },

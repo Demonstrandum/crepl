@@ -115,6 +115,7 @@ quoted variables `f ([x], [a])` becomes `[x^3 + 2x + a].
    - [x] Anonymous functions.
    - [x] Currying.
  - [ ] Tuple slicing with `a:b` range syntax.
+ - [x] Tuple splat operator `(a, ...tup)`.
  - [ ] Overloading operators. Operations on tuples.
  - [ ] Pool constant and literal values in a preallocated structure, to save on reallocating constants by preventing them from being garbage collected.
  - [x] Garbage collection.

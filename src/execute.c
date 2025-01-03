@@ -373,6 +373,112 @@ unary_discard:
 			break;
 		}
 
+		// Tuples
+		if (strcmp(op, ",") == 0) {
+			const ParseNode *head = stmt->node.binary.left;
+			const ParseNode *tail = stmt->node.binary.right;
+
+			const ParseNode *splatted = NULL;
+			// Handle splat `...` syntax.
+			if (head->type == UNARY_NODE) {
+				const ParseNode *splat = head->node.unary.callee;
+				if (splat->type == IDENT_NODE && strcmp(splat->node.ident.value, "...") == 0) {
+					splatted = head->node.unary.operand;
+				}
+			}
+
+			DataValue *lhs = NULL;
+			if (splatted != NULL) {
+				lhs = recursive_execute(ctx, splatted);
+				if (lhs->type != T_TUPLE) {
+					ERROR_TYPE = EXECUTION_ERROR;
+					strcpy(ERROR_MSG, "Cannot splat non-tuple.");
+					lhs = NULL;
+				}
+			} else {
+				lhs = recursive_execute(ctx, head);
+			}
+			if (lhs == NULL) return NULL;
+			DataValue *rhs = NULL;
+			if (tail->type == UNARY_NODE) {
+				const ParseNode *splat = tail->node.unary.callee;
+				if (splat->type == IDENT_NODE && strcmp(splat->node.ident.value, "...") == 0) {
+					rhs = recursive_execute(ctx, tail->node.unary.operand);
+					if (rhs->type != T_TUPLE) {
+						ERROR_TYPE = EXECUTION_ERROR;
+						strcpy(ERROR_MSG, "Cannot splat non-tuple.");
+						rhs = NULL;
+					}
+				}
+			} else {
+				rhs = recursive_execute(ctx, tail);
+			}
+			if (rhs == NULL) {
+				unlink_datavalue(lhs);
+				return NULL;
+			}
+
+			if (rhs->type != T_TUPLE) {
+				// Create new tuple.
+				Tuple *tuple = malloc(sizeof(Tuple));
+				tuple->length = 2;
+				tuple->capacity = 2;
+				if (splatted != NULL) {
+					Tuple *lhs_tup = lhs->value;
+					tuple->length = lhs_tup->length + 1;
+					tuple->capacity = tuple->length;
+				}
+				tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
+				tuple->items[0] = link_datavalue(rhs);
+				if (splatted != NULL) {
+					// Copy over the splatted values.
+					Tuple *lhs_tup = lhs->value;
+					for (usize i = 0; i < lhs_tup->length; ++i) {
+						tuple->items[i + 1] = link_datavalue(lhs_tup->items[i]);
+					}
+				} else {
+					tuple->items[1] = link_datavalue(lhs);
+				}
+				free(data);
+				data = heap_data(T_TUPLE, tuple);
+				unlink_datavalue(lhs);
+				unlink_datavalue(rhs);
+				break;
+			}
+
+			// RHS is a tuple, clone it and extend it.
+			Tuple *rhs_tup = rhs->value;
+			Tuple *tuple = malloc(sizeof(Tuple));
+			tuple->length = rhs_tup->length + 1;
+			if (splatted != NULL) {
+				Tuple *lhs_tup = lhs->value;
+				tuple->length = lhs_tup->length + rhs_tup->length;
+			}
+			tuple->capacity = tuple->length;
+			tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
+			// Copy old values;
+			for (usize i = 0; i < rhs_tup->length; ++i)
+				tuple->items[i] = link_datavalue(rhs_tup->items[i]);
+			// Grow capacity.
+			if (tuple->length >= tuple->capacity) {
+				tuple->capacity = 1.5 * tuple->length + 1;
+				tuple->items = realloc(tuple->items, tuple->capacity * sizeof(DataValue *));
+			}
+			if (splatted != NULL) {
+				Tuple *lhs_tup = lhs->value;
+				for (usize i = 0; i < lhs_tup->length; ++i) {
+					tuple->items[rhs_tup->length + i] = link_datavalue(lhs_tup->items[i]);
+				}
+			} else {
+				tuple->items[rhs_tup->length] = link_datavalue(lhs);
+			}
+			free(data);
+			data = heap_data(T_TUPLE, tuple);
+			unlink_datavalue(lhs);
+			unlink_datavalue(rhs);
+			break;
+		}
+
 		free(data);
 		// How to evaluate specific operators.
 		DataValue *lhs = recursive_execute(ctx, stmt->node.binary.left);
@@ -383,38 +489,6 @@ unary_discard:
 		if (rhs == NULL) {
 			unlink_datavalue(lhs);
 			return NULL;
-		}
-
-		// Tuples
-		if (strcmp(op, ",") == 0) {
-			if (rhs->type != T_TUPLE) {
-				// Create new tuple.
-				Tuple *tuple = malloc(sizeof(Tuple));
-				tuple->length = 2;
-				tuple->capacity = 2;
-				tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
-				tuple->items[0] = link_datavalue(rhs);
-				tuple->items[1] = link_datavalue(lhs);
-				data = heap_data(T_TUPLE, tuple);
-				goto binary_discard;
-			}
-			// RHS is a tuple, clone it and extend it.
-			Tuple *rhs_tuple = rhs->value;
-			Tuple *tuple = malloc(sizeof(Tuple));
-			tuple->length = rhs_tuple->length + 1;
-			tuple->capacity = rhs_tuple->capacity;
-			tuple->items = calloc(tuple->capacity, sizeof(DataValue *));
-			// Copy old values;
-			for (usize i = 0; i < rhs_tuple->length; ++i)
-				tuple->items[i] = link_datavalue(rhs_tuple->items[i]);
-			// Grow capacity.
-			if (tuple->length >= tuple->capacity) {
-				tuple->capacity = 1.5 * tuple->length + 1;
-				tuple->items = realloc(tuple->items, tuple->capacity * sizeof(DataValue *));
-			}
-			tuple->items[rhs_tuple->length] = link_datavalue(lhs);
-			data = heap_data(T_TUPLE, tuple);
-			goto binary_discard;
 		}
 
 		// Semicolons
