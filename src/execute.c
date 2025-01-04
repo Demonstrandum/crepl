@@ -790,30 +790,40 @@ bool match_local(Context *ctx, const ParseNode *pat, DataValue *val)
     if (val->type == T_TUPLE) {
         Tuple *tuple = (Tuple*)val->value;
 
-        // Count pattern elements by walking the binary comma nodes
-        usize pattern_len = 1;
-        const ParseNode *curr = pat;
-        while (curr->type == BINARY_NODE &&
-                curr->node.binary.callee->type == IDENT_NODE &&
-                strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
-            pattern_len++;
-            curr = curr->node.binary.right;
-        }
-
-        if (pattern_len != tuple->length) return false;
-
         // Match each element
         ssize tuple_idx = tuple->length - 1;
-        curr = pat;
-        while (curr->type == BINARY_NODE
-            && curr->node.binary.callee->type == IDENT_NODE
-            && strcmp(curr->node.binary.callee->node.ident.value, ",") == 0) {
+        const ParseNode *curr = pat;
+        while (
+        	curr->type == BINARY_NODE
+	     && curr->node.binary.callee->type == IDENT_NODE
+	     && strcmp(curr->node.binary.callee->node.ident.value, ",") == 0
+        ) {
             if (tuple_idx < 0) return false;
             if (!match_local(ctx, curr->node.binary.left, tuple->items[tuple_idx--]))
                 return false;
             curr = curr->node.binary.right;
         }
+
         // Match the final element
+        if (curr->type == UNARY_NODE) {
+        	// Check for `...` splat pattern.
+        	const ParseNode *op = curr->node.unary.callee;
+         	const ParseNode *pat = curr->node.unary.operand;
+         	if (op->type == IDENT_NODE && strcmp(op->node.ident.value, "...") == 0) {
+          		if (tuple_idx == 0)
+            		return match_local(ctx, pat, tuple->items[0]);
+          		// Create tuple linking trailing elements.
+            	Tuple *tail_tuple = malloc(sizeof(Tuple));
+             	tail_tuple->length = tuple_idx + 1;
+              	tail_tuple->capacity = tail_tuple->length;
+               	tail_tuple->items = calloc(tail_tuple->capacity, sizeof(DataValue *));
+          		for (usize i = 0; i < tail_tuple->length; ++i) {
+	            	tail_tuple->items[i] = link_datavalue(tuple->items[i]);
+	            }
+            	DataValue *tail = heap_data(T_TUPLE, tail_tuple);
+            	return match_local(ctx, pat, tail);
+          	}
+        }
         return match_local(ctx, curr, tuple->items[tuple_idx]);
     }
 
